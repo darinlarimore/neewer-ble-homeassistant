@@ -317,14 +317,22 @@ class NeewerLightDevice:
         return await self._send_command(cmd)
 
 
+def _is_neewer_device(name: str) -> bool:
+    """Check if a device name indicates a Neewer device."""
+    if not name:
+        return False
+    name_upper = name.upper()
+    return "NEEWER" in name_upper or name_upper.startswith("NW-")
+
+
 async def discover_neewer_lights(timeout: float = 10.0) -> list[BLEDevice]:
     """Discover Neewer BLE lights."""
     _LOGGER.debug("Scanning for Neewer lights...")
-    
+
     devices = []
-    
+
     def detection_callback(device: BLEDevice, advertisement_data):
-        if device.name and "NEEWER" in device.name.upper():
+        if _is_neewer_device(device.name):
             _LOGGER.debug("Found Neewer device: %s (%s)", device.name, device.address)
             devices.append(device)
     

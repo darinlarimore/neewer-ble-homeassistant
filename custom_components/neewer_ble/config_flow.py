@@ -33,6 +33,14 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_devices: dict[str, BLEDevice] = {}
         self._discovery_info: BluetoothServiceInfoBleak | None = None
 
+    @staticmethod
+    def _is_neewer_device(name: str) -> bool:
+        """Check if a device name indicates a Neewer device."""
+        if not name:
+            return False
+        name_upper = name.upper()
+        return "NEEWER" in name_upper or name_upper.startswith("NW-")
+
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
     ) -> FlowResult:
@@ -46,7 +54,7 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         # Check if this looks like a Neewer device
         name = discovery_info.name or ""
-        if "NEEWER" not in name.upper():
+        if not self._is_neewer_device(name):
             return self.async_abort(reason="not_neewer_device")
         
         self.context["title_placeholders"] = {"name": name}
@@ -164,7 +172,7 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # First check already discovered bluetooth devices in HA
         try:
             for discovery_info in async_discovered_service_info(self.hass, connectable=True):
-                if discovery_info.name and "NEEWER" in discovery_info.name.upper():
+                if self._is_neewer_device(discovery_info.name):
                     self._discovered_devices[discovery_info.address] = discovery_info.device
         except Exception as err:
             _LOGGER.debug("Error checking HA bluetooth discoveries: %s", err)
@@ -175,7 +183,7 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 devices = await BleakScanner.discover(timeout=BLE_SCAN_TIMEOUT)
                 for device in devices:
-                    if device.name and "NEEWER" in device.name.upper():
+                    if self._is_neewer_device(device.name):
                         self._discovered_devices[device.address] = device
             except Exception as err:
                 _LOGGER.error("BLE scan failed: %s", err)

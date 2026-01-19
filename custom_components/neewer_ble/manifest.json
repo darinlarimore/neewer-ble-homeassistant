@@ -13,6 +13,9 @@
   "bluetooth": [
     {
       "local_name": "NEEWER*"
+    },
+    {
+      "local_name": "NW-*"
     }
   ]
 }
