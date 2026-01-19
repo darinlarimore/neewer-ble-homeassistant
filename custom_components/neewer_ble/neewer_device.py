@@ -13,18 +13,23 @@ from bleak.exc import BleakError
 from .const import (
     NEEWER_SERVICE_UUID,
     NEEWER_WRITE_CHARACTERISTIC_UUID,
-    CMD_PREFIX_STANDARD,
-    CMD_PREFIX_INFINITY,
-    CMD_SET_CCT,
-    CMD_SET_HSI,
-    CMD_POWER_ON,
-    CMD_POWER_OFF,
     SUPPORTED_MODELS,
     MAX_CONNECTION_RETRIES,
     CONNECTION_RETRY_DELAY,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# Protocol constants
+# Standard protocol command bytes
+STD_POWER_CMD = 0x81  # Standard power command
+STD_CCT_CMD = 0x87    # Standard CCT command
+STD_HSI_CMD = 0x86    # Standard HSI command
+
+# Infinity protocol command bytes
+INF_POWER_CMD = 0x8D  # Infinity power command (141)
+INF_CCT_CMD = 0x90    # Infinity CCT command (144)
+INF_HSI_CMD = 0x91    # Infinity HSI command (145)
 
 
 class NeewerLightDevice:
@@ -120,6 +125,31 @@ class NeewerLightDevice:
         """Return True if connected."""
         return self._connected and self._client is not None and self._client.is_connected
 
+    def _get_mac_bytes(self) -> list[int]:
+        """Convert MAC address string to list of integer bytes."""
+        # Handle both colon and dash separated MAC addresses
+        mac = self._address.replace("-", ":")
+        parts = mac.split(":")
+        if len(parts) == 6:
+            return [int(p, 16) for p in parts]
+        # Fallback - return zeros if MAC format is unexpected
+        _LOGGER.warning("Unexpected MAC format: %s", self._address)
+        return [0, 0, 0, 0, 0, 0]
+
+    def _calculate_checksum(self, data: list[int]) -> int:
+        """Calculate checksum for command (sum of all bytes & 0xFF)."""
+        checksum = 0
+        for byte in data:
+            if byte < 0:
+                checksum += byte + 256
+            else:
+                checksum += byte
+        return checksum & 0xFF
+
+    def _add_checksum(self, cmd: list[int]) -> list[int]:
+        """Add checksum byte to command."""
+        return cmd + [self._calculate_checksum(cmd)]
+
     async def connect(self) -> bool:
         """Connect to the device."""
         if self.is_connected:
@@ -193,25 +223,34 @@ class NeewerLightDevice:
 
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
         """Build a CCT (brightness + color temperature) command.
-        
+
         Args:
             brightness: 0-100
-            color_temp: 0-100 (internal scale, 0=warm, 100=cool)
+            color_temp: 0-100 (internal scale, maps to kelvin range)
         """
         if self.uses_infinity_protocol:
-            # Infinity protocol format
-            # [0x78, 0x8A, 0x02, brightness, color_temp, 0x02, checksum]
-            cmd = CMD_PREFIX_INFINITY + [CMD_SET_CCT, brightness, color_temp, 0x02]
+            # Infinity protocol format:
+            # [0x78, 0x90, 0x0B, MAC(6 bytes), 0x87, brightness, temp, GM, 0x04, checksum]
+            # temp is 32-72 representing 3200K-7200K
+            # GM (green-magenta) is 0-100 where 50 is neutral
+            min_k, max_k = self.color_temp_range
+            # Map 0-100 internal scale to 32-72 protocol scale
+            temp_protocol = int(32 + (color_temp / 100) * 40)
+            gm_value = 50  # Neutral GM
+
+            cmd = [0x78, INF_CCT_CMD, 0x0B]  # Header + command + length
+            cmd.extend(self._get_mac_bytes())  # 6 MAC bytes
+            cmd.extend([0x87, brightness, temp_protocol, gm_value, 0x04])
+            return self._add_checksum(cmd)
         else:
-            # Standard protocol format
-            # [0x78, 0x87, 0x02, brightness, color_temp]
-            cmd = CMD_PREFIX_STANDARD + [CMD_SET_CCT, brightness, color_temp]
-        
-        return cmd
+            # Standard protocol format:
+            # [0x78, 0x87, 0x02, brightness, color_temp, checksum]
+            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, color_temp]
+            return self._add_checksum(cmd)
 
     def _build_hsi_command(self, hue: int, saturation: int, intensity: int) -> list[int]:
         """Build an HSI (hue, saturation, intensity) command for RGB lights.
-        
+
         Args:
             hue: 0-360
             saturation: 0-100
@@ -220,22 +259,35 @@ class NeewerLightDevice:
         # Hue is sent as two bytes (little endian)
         hue_low = hue & 0xFF
         hue_high = (hue >> 8) & 0xFF
-        
+
         if self.uses_infinity_protocol:
-            cmd = CMD_PREFIX_INFINITY + [CMD_SET_HSI, intensity, hue_low, hue_high, saturation]
+            # Infinity HSI format:
+            # [0x78, 0x91, 0x0C, MAC(6 bytes), 0x86, intensity, hue_low, hue_high, sat, 0x04, checksum]
+            cmd = [0x78, INF_HSI_CMD, 0x0C]
+            cmd.extend(self._get_mac_bytes())
+            cmd.extend([0x86, intensity, hue_low, hue_high, saturation, 0x04])
+            return self._add_checksum(cmd)
         else:
-            cmd = CMD_PREFIX_STANDARD + [CMD_SET_HSI, intensity, hue_low, hue_high, saturation]
-        
-        return cmd
+            # Standard HSI format:
+            # [0x78, 0x86, 0x04, intensity, hue_low, hue_high, saturation, checksum]
+            cmd = [0x78, STD_HSI_CMD, 0x04, intensity, hue_low, hue_high, saturation]
+            return self._add_checksum(cmd)
 
     def _build_power_command(self, on: bool) -> list[int]:
         """Build a power on/off command."""
-        cmd_type = CMD_POWER_ON if on else CMD_POWER_OFF
-        
         if self.uses_infinity_protocol:
-            return CMD_PREFIX_INFINITY + [cmd_type]
+            # Infinity power format:
+            # [0x78, 0x8D, 0x08, MAC(6 bytes), 0x81, on/off, checksum]
+            cmd = [0x78, INF_POWER_CMD, 0x08]
+            cmd.extend(self._get_mac_bytes())
+            cmd.extend([0x81, 1 if on else 0])
+            return self._add_checksum(cmd)
         else:
-            return CMD_PREFIX_STANDARD + [cmd_type]
+            # Standard power format:
+            # [0x78, 0x81, 0x01, on/off, checksum]
+            # on=1, off=2 for standard protocol
+            cmd = [0x78, STD_POWER_CMD, 0x01, 1 if on else 2]
+            return self._add_checksum(cmd)
 
     def _kelvin_to_internal(self, kelvin: int) -> int:
         """Convert Kelvin to internal 0-100 scale."""
@@ -280,8 +332,8 @@ class NeewerLightDevice:
     async def turn_off(self) -> bool:
         """Turn off the light."""
         self._is_on = False
-        # Send brightness 0 command (most Neewer lights don't have explicit off)
-        cmd = self._build_cct_command(0, self._color_temp)
+        # Use explicit power off command
+        cmd = self._build_power_command(on=False)
         return await self._send_command(cmd)
 
     async def set_brightness(self, brightness: int) -> bool:

@@ -8,19 +8,6 @@ NEEWER_SERVICE_UUID = "69400001-b5a3-f393-e0a9-e50e24dcca99"
 NEEWER_WRITE_CHARACTERISTIC_UUID = "69400002-b5a3-f393-e0a9-e50e24dcca99"
 NEEWER_READ_CHARACTERISTIC_UUID = "69400003-b5a3-f393-e0a9-e50e24dcca99"
 
-# Command prefixes for different protocols
-# Standard Neewer protocol
-CMD_PREFIX_STANDARD = [0x78, 0x87]
-# Newer "Infinity" protocol used by some models
-CMD_PREFIX_INFINITY = [0x78, 0x8A]
-
-# Command types
-CMD_POWER_ON = 0x01
-CMD_POWER_OFF = 0x02
-CMD_SET_CCT = 0x02  # Brightness + Color Temperature
-CMD_SET_HSI = 0x03  # Hue, Saturation, Intensity (for RGB models)
-CMD_SET_SCENE = 0x04  # Scene/Effect mode
-
 # Supported light models with their specifications
 # Format: "model_code": {"name": str, "rgb": bool, "cct_range": (min_kelvin, max_kelvin), "infinity": bool}
 SUPPORTED_MODELS = {
