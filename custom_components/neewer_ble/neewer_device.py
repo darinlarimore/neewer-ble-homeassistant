@@ -20,16 +20,19 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Protocol constants
+# Protocol constants (from NeewerLite-Python)
+# Standard protocol: [0x78, CMD, LEN, ...params, checksum]
+# Infinity protocol: [0x78, CMD, LEN, MAC(6), ...params, checksum]
+
 # Standard protocol command bytes
-STD_POWER_CMD = 0x81  # Standard power command
-STD_CCT_CMD = 0x87    # Standard CCT command
-STD_HSI_CMD = 0x86    # Standard HSI command
+STD_POWER_CMD = 0x81   # 129 - Power on/off
+STD_CCT_CMD = 0x87     # 135 - CCT mode (brightness, temp, GM)
+STD_HSI_CMD = 0x86     # 134 - HSI mode (hue, sat, brightness)
 
 # Infinity protocol command bytes
-INF_POWER_CMD = 0x8D  # Infinity power command (141)
-INF_CCT_CMD = 0x90    # Infinity CCT command (144)
-INF_HSI_CMD = 0x91    # Infinity HSI command (145)
+INF_POWER_CMD = 0x8D   # 141 - Power on/off
+INF_CCT_CMD = 0x90     # 144 - CCT mode
+INF_HSI_CMD = 0x8F     # 143 - HSI mode (NOT 0x91!)
 
 
 class NeewerLightDevice:
@@ -224,32 +227,37 @@ class NeewerLightDevice:
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
         """Build a CCT (brightness + color temperature) command.
 
+        From NeewerLite-Python:
+        - Standard: [120, 135, 2, brightness, temp, GM] + checksum
+        - Infinity: [120, 144, 11, MAC(6), 135, brightness, temp, GM, 4] + checksum
+
         Args:
             brightness: 0-100
             color_temp: 0-100 (internal scale, maps to kelvin range)
         """
-        if self.uses_infinity_protocol:
-            # Infinity protocol format:
-            # [0x78, 0x90, 0x0B, MAC(6 bytes), 0x87, brightness, temp, GM, 0x04, checksum]
-            # temp is 32-72 representing 3200K-7200K
-            # GM (green-magenta) is 0-100 where 50 is neutral
-            min_k, max_k = self.color_temp_range
-            # Map 0-100 internal scale to 32-72 protocol scale
-            temp_protocol = int(32 + (color_temp / 100) * 40)
-            gm_value = 50  # Neutral GM
+        # Convert internal 0-100 scale to protocol temp value
+        # NeewerLite uses 32-56 for 3200K-5600K, 32-72 for wider ranges
+        # We'll map 0-100 to 32-56 (common range)
+        temp_protocol = int(32 + (color_temp / 100) * 24)
+        gm_value = 50  # Neutral GM (green-magenta tint, 0-100, 50=neutral)
 
-            cmd = [0x78, INF_CCT_CMD, 0x0B]  # Header + command + length
-            cmd.extend(self._get_mac_bytes())  # 6 MAC bytes
-            cmd.extend([0x87, brightness, temp_protocol, gm_value, 0x04])
+        if self.uses_infinity_protocol:
+            # Infinity: [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
+            cmd = [0x78, INF_CCT_CMD, 0x0B]
+            cmd.extend(self._get_mac_bytes())
+            cmd.extend([STD_CCT_CMD, brightness, temp_protocol, gm_value, 0x04])
             return self._add_checksum(cmd)
         else:
-            # Standard protocol format:
-            # [0x78, 0x87, 0x02, brightness, color_temp, checksum]
-            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, color_temp]
+            # Standard: [0x78, 0x87, 0x02, brightness, temp, GM] + checksum
+            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, temp_protocol, gm_value]
             return self._add_checksum(cmd)
 
     def _build_hsi_command(self, hue: int, saturation: int, intensity: int) -> list[int]:
         """Build an HSI (hue, saturation, intensity) command for RGB lights.
+
+        From NeewerLite-Python:
+        - Standard: [120, 134, 4, hue_low, hue_high, saturation, brightness] + checksum
+        - Infinity: [120, 143, 11, MAC(6), 134, hue_low, hue_high, saturation, brightness] + checksum
 
         Args:
             hue: 0-360
@@ -261,30 +269,31 @@ class NeewerLightDevice:
         hue_high = (hue >> 8) & 0xFF
 
         if self.uses_infinity_protocol:
-            # Infinity HSI format:
-            # [0x78, 0x91, 0x0C, MAC(6 bytes), 0x86, intensity, hue_low, hue_high, sat, 0x04, checksum]
-            cmd = [0x78, INF_HSI_CMD, 0x0C]
+            # Infinity: [0x78, 0x8F, 0x0B, MAC(6), 0x86, hue_low, hue_high, sat, brightness] + checksum
+            cmd = [0x78, INF_HSI_CMD, 0x0B]
             cmd.extend(self._get_mac_bytes())
-            cmd.extend([0x86, intensity, hue_low, hue_high, saturation, 0x04])
+            cmd.extend([STD_HSI_CMD, hue_low, hue_high, saturation, intensity])
             return self._add_checksum(cmd)
         else:
-            # Standard HSI format:
-            # [0x78, 0x86, 0x04, intensity, hue_low, hue_high, saturation, checksum]
-            cmd = [0x78, STD_HSI_CMD, 0x04, intensity, hue_low, hue_high, saturation]
+            # Standard: [0x78, 0x86, 0x04, hue_low, hue_high, sat, brightness] + checksum
+            cmd = [0x78, STD_HSI_CMD, 0x04, hue_low, hue_high, saturation, intensity]
             return self._add_checksum(cmd)
 
     def _build_power_command(self, on: bool) -> list[int]:
-        """Build a power on/off command."""
+        """Build a power on/off command.
+
+        From NeewerLite-Python:
+        - Standard: [120, 129, 1, 1/2] + checksum (1=on, 2=off)
+        - Infinity: [120, 141, 8, MAC(6), 129, 1/0] + checksum (1=on, 0=off)
+        """
         if self.uses_infinity_protocol:
-            # Infinity power format:
-            # [0x78, 0x8D, 0x08, MAC(6 bytes), 0x81, on/off, checksum]
+            # Infinity: [0x78, 0x8D, 0x08, MAC(6), 0x81, on/off] + checksum
             cmd = [0x78, INF_POWER_CMD, 0x08]
             cmd.extend(self._get_mac_bytes())
-            cmd.extend([0x81, 1 if on else 0])
+            cmd.extend([STD_POWER_CMD, 1 if on else 0])
             return self._add_checksum(cmd)
         else:
-            # Standard power format:
-            # [0x78, 0x81, 0x01, on/off, checksum]
+            # Standard: [0x78, 0x81, 0x01, on/off] + checksum
             # on=1, off=2 for standard protocol
             cmd = [0x78, STD_POWER_CMD, 0x01, 1 if on else 2]
             return self._add_checksum(cmd)
