@@ -4,9 +4,9 @@ DOMAIN = "neewer_ble"
 
 # BLE Service and Characteristic UUIDs
 # Neewer uses a custom GATT service for light control
-NEEWER_SERVICE_UUID = "69400001-b5a3-f393-e0a9-e50e24dcca9e"
-NEEWER_WRITE_CHARACTERISTIC_UUID = "69400002-b5a3-f393-e0a9-e50e24dcca9e"
-NEEWER_READ_CHARACTERISTIC_UUID = "69400003-b5a3-f393-e0a9-e50e24dcca9e"
+NEEWER_SERVICE_UUID = "69400001-b5a3-f393-e0a9-e50e24dcca99"
+NEEWER_WRITE_CHARACTERISTIC_UUID = "69400002-b5a3-f393-e0a9-e50e24dcca99"
+NEEWER_READ_CHARACTERISTIC_UUID = "69400003-b5a3-f393-e0a9-e50e24dcca99"
 
 # Command prefixes for different protocols
 # Standard Neewer protocol
