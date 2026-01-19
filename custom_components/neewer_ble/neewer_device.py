@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import platform
+import subprocess
 from typing import Any
 
 from bleak import BleakClient, BleakScanner
@@ -43,12 +45,16 @@ class NeewerLightDevice:
         self._ble_device = ble_device
         self._client: BleakClient | None = None
         self._lock = asyncio.Lock()
-        
+
         # Device info
         self._address = ble_device.address
         self._name = ble_device.name or "Unknown Neewer Light"
         self._model_info = model_info or self._detect_model()
-        
+
+        # Hardware MAC address (needed for Infinity protocol)
+        # On macOS, bleak returns UUIDs, not real MAC addresses
+        self._hw_mac_address: str | None = None
+
         # State
         self._is_on = False
         self._brightness = 100
@@ -128,13 +134,79 @@ class NeewerLightDevice:
         """Return True if connected."""
         return self._connected and self._client is not None and self._client.is_connected
 
+    def _get_hardware_mac_macos(self) -> str | None:
+        """Get hardware MAC address on macOS using system_profiler.
+
+        On macOS, bleak returns UUIDs instead of real MAC addresses.
+        We need the real MAC for Infinity protocol commands.
+        """
+        try:
+            result = subprocess.run(
+                ["system_profiler", "SPBluetoothDataType"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            output = result.stdout
+
+            # Find the device by name
+            name_offset = output.find(self._name)
+            if name_offset == -1:
+                _LOGGER.debug("Device %s not found in system_profiler output", self._name)
+                return None
+
+            # Find "Address:" after the device name
+            address_offset = output.find("Address:", name_offset)
+            if address_offset == -1:
+                _LOGGER.debug("Address not found for %s", self._name)
+                return None
+
+            # Extract the MAC address (format: XX-XX-XX-XX-XX-XX or XX:XX:XX:XX:XX:XX)
+            # Address is 17 chars after "Address: "
+            mac_start = address_offset + 9
+            mac_str = output[mac_start:mac_start + 17].strip()
+
+            # Validate it looks like a MAC address
+            mac_clean = mac_str.replace("-", ":").upper()
+            parts = mac_clean.split(":")
+            if len(parts) == 6 and all(len(p) == 2 for p in parts):
+                _LOGGER.debug("Found hardware MAC for %s: %s", self._name, mac_clean)
+                return mac_clean
+
+            _LOGGER.debug("Invalid MAC format found: %s", mac_str)
+            return None
+
+        except subprocess.TimeoutExpired:
+            _LOGGER.warning("system_profiler timed out")
+            return None
+        except Exception as err:
+            _LOGGER.debug("Error getting hardware MAC: %s", err)
+            return None
+
     def _get_mac_bytes(self) -> list[int]:
         """Convert MAC address string to list of integer bytes."""
-        # Handle both colon and dash separated MAC addresses
+        # For Infinity protocol on macOS, we need the real hardware MAC
+        if self.uses_infinity_protocol and platform.system() == "Darwin":
+            if self._hw_mac_address is None:
+                self._hw_mac_address = self._get_hardware_mac_macos()
+
+            if self._hw_mac_address:
+                mac = self._hw_mac_address.replace("-", ":")
+                parts = mac.split(":")
+                if len(parts) == 6:
+                    return [int(p, 16) for p in parts]
+
+            _LOGGER.warning(
+                "Could not get hardware MAC for %s on macOS, Infinity commands may fail",
+                self._name
+            )
+
+        # For non-macOS or non-Infinity, use the BLE address directly
         mac = self._address.replace("-", ":")
         parts = mac.split(":")
         if len(parts) == 6:
             return [int(p, 16) for p in parts]
+
         # Fallback - return zeros if MAC format is unexpected
         _LOGGER.warning("Unexpected MAC format: %s", self._address)
         return [0, 0, 0, 0, 0, 0]
