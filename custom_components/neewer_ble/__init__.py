@@ -1,0 +1,80 @@
+"""The Neewer BLE Lights integration."""
+
+from __future__ import annotations
+
+import logging
+
+from bleak.backends.device import BLEDevice
+
+from homeassistant.components.bluetooth import (
+    BluetoothScanningMode,
+    BluetoothServiceInfoBleak,
+    async_ble_device_from_address,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_ADDRESS, Platform
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
+
+from .const import DOMAIN, PLATFORMS
+from .neewer_device import NeewerLightDevice
+
+_LOGGER = logging.getLogger(__name__)
+
+PLATFORMS: list[Platform] = [Platform.LIGHT]
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up Neewer BLE Lights from a config entry."""
+    address: str = entry.data[CONF_ADDRESS]
+    
+    _LOGGER.debug("Setting up Neewer BLE device: %s", address)
+    
+    # Try to get the BLE device
+    ble_device = async_ble_device_from_address(hass, address.upper(), connectable=True)
+    
+    if ble_device is None:
+        _LOGGER.debug("Device %s not found via HA Bluetooth, creating placeholder", address)
+        # Create a minimal BLE device object for connection attempts
+        # The actual connection will happen when commands are sent
+        ble_device = BLEDevice(
+            address=address,
+            name=entry.data.get("name", "Neewer Light"),
+            details={},
+            rssi=-100,
+        )
+    
+    # Create the device handler
+    device = NeewerLightDevice(ble_device)
+    
+    # Store the device
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = device
+    
+    # Set up platforms
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    _LOGGER.debug("Unloading Neewer BLE device: %s", entry.data.get(CONF_ADDRESS))
+    
+    # Unload platforms
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    
+    if unload_ok:
+        # Disconnect and clean up
+        device: NeewerLightDevice = hass.data[DOMAIN].pop(entry.entry_id)
+        await device.disconnect()
+    
+    return unload_ok
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old entry."""
+    _LOGGER.debug("Migrating from version %s", entry.version)
+    
+    # No migrations needed yet
+    return True

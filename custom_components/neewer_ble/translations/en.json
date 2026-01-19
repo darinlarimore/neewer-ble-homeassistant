@@ -1,0 +1,43 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Select Neewer Light",
+        "description": "Select a discovered Neewer BLE light to add.",
+        "data": {
+          "address": "Device"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Confirm Neewer Light",
+        "description": "Do you want to add the Neewer light **{name}** ({address})?"
+      },
+      "manual": {
+        "title": "Manual Entry",
+        "description": "Enter the Bluetooth address of your Neewer light manually.",
+        "data": {
+          "address": "Bluetooth Address (e.g., AA:BB:CC:DD:EE:FF)",
+          "name": "Device Name"
+        }
+      }
+    },
+    "error": {
+      "device_not_found": "Device not found. Make sure the light is powered on and in range.",
+      "invalid_address": "Invalid Bluetooth address format. Use format AA:BB:CC:DD:EE:FF.",
+      "cannot_connect": "Failed to connect to the device.",
+      "unknown": "An unknown error occurred."
+    },
+    "abort": {
+      "already_configured": "This device is already configured.",
+      "no_devices_found": "No Neewer lights found. Make sure your lights are powered on and Bluetooth is enabled.",
+      "not_neewer_device": "This device does not appear to be a Neewer light."
+    }
+  },
+  "entity": {
+    "light": {
+      "neewer_light": {
+        "name": "Light"
+      }
+    }
+  }
+}
