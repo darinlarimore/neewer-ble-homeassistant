@@ -90,13 +90,17 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            address = user_input[CONF_ADDRESS]
-            
+            address = user_input.get(CONF_ADDRESS)
+
+            # Check if user selected manual entry
+            if address == "manual":
+                return await self.async_step_manual()
+
             if address in self._discovered_devices:
                 device = self._discovered_devices[address]
                 await self.async_set_unique_id(address)
                 self._abort_if_unique_id_configured()
-                
+
                 return self.async_create_entry(
                     title=device.name or "Neewer Light",
                     data={
@@ -110,14 +114,13 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Scan for devices
         await self._async_discover_devices()
 
-        if not self._discovered_devices:
-            return self.async_abort(reason="no_devices_found")
-
-        # Build the selection schema
+        # Build the selection schema - always include manual option
         device_options = {
             address: f"{device.name or 'Unknown'} ({address})"
             for address, device in self._discovered_devices.items()
         }
+        # Add manual entry option
+        device_options["manual"] = "Enter address manually..."
 
         return self.async_show_form(
             step_id="user",
