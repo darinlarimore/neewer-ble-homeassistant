@@ -290,37 +290,27 @@ class NeewerLightDevice:
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
         """Build a CCT (brightness + color temperature) command.
 
-        From NeewerLite-Python:
-        - Standard: [120, 135, 2, brightness, temp, GM] + checksum
-        - Infinity: [120, 144, 11, MAC(6), 135, brightness, temp, GM, 4] + checksum
-
         Args:
             brightness: 0-100
             color_temp: 0-100 (internal scale, maps to kelvin range)
         """
-        # Convert internal 0-100 scale to protocol temp value
-        # NeewerLite uses 32-56 for 3200K-5600K, 32-72 for wider ranges
-        # We'll map 0-100 to 32-56 (common range)
-        temp_protocol = int(32 + (color_temp / 100) * 24)
-        gm_value = 50  # Neutral GM (green-magenta tint, 0-100, 50=neutral)
-
         if self.uses_infinity_protocol:
-            # Infinity: [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
+            # Infinity protocol needs MAC address, temp conversion, GM value, and checksum
+            # Format: [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
+            temp_protocol = int(32 + (color_temp / 100) * 24)
+            gm_value = 50  # Neutral GM
+
             cmd = [0x78, INF_CCT_CMD, 0x0B]
             cmd.extend(self._get_mac_bytes())
             cmd.extend([STD_CCT_CMD, brightness, temp_protocol, gm_value, 0x04])
             return self._add_checksum(cmd)
         else:
-            # Standard: [0x78, 0x87, 0x02, brightness, temp, GM] + checksum
-            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, temp_protocol, gm_value]
-            return self._add_checksum(cmd)
+            # Standard protocol - simple format, no checksum
+            # Format: [0x78, 0x87, 0x02, brightness, color_temp]
+            return [0x78, STD_CCT_CMD, 0x02, brightness, color_temp]
 
     def _build_hsi_command(self, hue: int, saturation: int, intensity: int) -> list[int]:
         """Build an HSI (hue, saturation, intensity) command for RGB lights.
-
-        From NeewerLite-Python:
-        - Standard: [120, 134, 4, hue_low, hue_high, saturation, brightness] + checksum
-        - Infinity: [120, 143, 11, MAC(6), 134, hue_low, hue_high, saturation, brightness] + checksum
 
         Args:
             hue: 0-360
@@ -338,17 +328,12 @@ class NeewerLightDevice:
             cmd.extend([STD_HSI_CMD, hue_low, hue_high, saturation, intensity])
             return self._add_checksum(cmd)
         else:
-            # Standard: [0x78, 0x86, 0x04, hue_low, hue_high, sat, brightness] + checksum
-            cmd = [0x78, STD_HSI_CMD, 0x04, hue_low, hue_high, saturation, intensity]
-            return self._add_checksum(cmd)
+            # Standard protocol - simple format, no checksum
+            # Format: [0x78, 0x86, 0x04, brightness, hue_low, hue_high, saturation]
+            return [0x78, STD_HSI_CMD, 0x04, intensity, hue_low, hue_high, saturation]
 
     def _build_power_command(self, on: bool) -> list[int]:
-        """Build a power on/off command.
-
-        From NeewerLite-Python:
-        - Standard: [120, 129, 1, 1/2] + checksum (1=on, 2=off)
-        - Infinity: [120, 141, 8, MAC(6), 129, 1/0] + checksum (1=on, 0=off)
-        """
+        """Build a power on/off command."""
         if self.uses_infinity_protocol:
             # Infinity: [0x78, 0x8D, 0x08, MAC(6), 0x81, on/off] + checksum
             cmd = [0x78, INF_POWER_CMD, 0x08]
@@ -356,10 +341,9 @@ class NeewerLightDevice:
             cmd.extend([STD_POWER_CMD, 1 if on else 0])
             return self._add_checksum(cmd)
         else:
-            # Standard: [0x78, 0x81, 0x01, on/off] + checksum
-            # on=1, off=2 for standard protocol
-            cmd = [0x78, STD_POWER_CMD, 0x01, 1 if on else 2]
-            return self._add_checksum(cmd)
+            # Standard protocol - simple format, no checksum
+            # Format: [0x78, 0x81, 0x01, on/off] (1=on, 2=off)
+            return [0x78, STD_POWER_CMD, 0x01, 1 if on else 2]
 
     def _kelvin_to_internal(self, kelvin: int) -> int:
         """Convert Kelvin to internal 0-100 scale."""
