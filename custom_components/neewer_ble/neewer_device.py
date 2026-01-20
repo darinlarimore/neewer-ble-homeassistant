@@ -275,7 +275,12 @@ class NeewerLightDevice:
             return False
 
         try:
-            _LOGGER.debug("Sending command: %s", [hex(b) for b in command])
+            _LOGGER.info(
+                "Sending to %s: %s (decimal: %s)",
+                self._name,
+                [hex(b) for b in command],
+                command,
+            )
             await self._client.write_gatt_char(
                 NEEWER_WRITE_CHARACTERISTIC_UUID,
                 bytes(command),
