@@ -31,8 +31,18 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Neewer BLE light from a config entry."""
+    _LOGGER.debug("Setting up light entity for entry: %s", entry.entry_id)
+
     device: NeewerLightDevice = hass.data[DOMAIN][entry.entry_id]
-    
+
+    _LOGGER.debug(
+        "Creating light entity - Name: %s, Model: %s, RGB: %s, Infinity: %s",
+        device.name,
+        device.model_name,
+        device.supports_rgb,
+        device.uses_infinity_protocol,
+    )
+
     async_add_entities([NeewerBLELight(device, entry)])
 
 

@@ -27,33 +27,48 @@ PLATFORMS: list[Platform] = [Platform.LIGHT]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Neewer BLE Lights from a config entry."""
     address: str = entry.data[CONF_ADDRESS]
-    
-    _LOGGER.debug("Setting up Neewer BLE device: %s", address)
-    
+    name: str = entry.data.get("name", "Neewer Light")
+
+    _LOGGER.info("Setting up Neewer BLE device: %s (%s)", name, address)
+
     # Try to get the BLE device
     ble_device = async_ble_device_from_address(hass, address.upper(), connectable=True)
-    
+
     if ble_device is None:
-        _LOGGER.debug("Device %s not found via HA Bluetooth, creating placeholder", address)
+        _LOGGER.warning(
+            "Device %s not found via HA Bluetooth, creating placeholder with name '%s'",
+            address,
+            name,
+        )
         # Create a minimal BLE device object for connection attempts
         # The actual connection will happen when commands are sent
         ble_device = BLEDevice(
             address=address,
-            name=entry.data.get("name", "Neewer Light"),
+            name=name,
             details={},
             rssi=-100,
         )
-    
+    else:
+        _LOGGER.info("Found BLE device: %s (%s)", ble_device.name, ble_device.address)
+
     # Create the device handler
     device = NeewerLightDevice(ble_device)
-    
+    _LOGGER.info(
+        "Created device handler - Model: %s, RGB: %s, Infinity: %s",
+        device.model_name,
+        device.supports_rgb,
+        device.uses_infinity_protocol,
+    )
+
     # Store the device
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = device
-    
+
     # Set up platforms
+    _LOGGER.debug("Forwarding setup to platforms: %s", PLATFORMS)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    
+
+    _LOGGER.info("Setup complete for %s", name)
     return True
 
 
