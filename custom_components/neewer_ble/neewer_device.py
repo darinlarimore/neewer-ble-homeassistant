@@ -298,25 +298,29 @@ class NeewerLightDevice:
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
         """Build a CCT (brightness + color temperature) command.
 
+        From NeewerLite-Python:
+        - Standard: [120, 135, 2, brightness, temp, GM] + checksum
+          where temp is 32-56 (for 3200K-5600K), GM is 50 (neutral)
+        - Infinity: [120, 144, 11, MAC(6), 135, brightness, temp, GM, 4] + checksum
+
         Args:
             brightness: 0-100
             color_temp: 0-100 (internal scale, maps to kelvin range)
         """
-        if self.uses_infinity_protocol:
-            # Infinity protocol needs temp conversion and GM value
-            # Format: [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
-            temp_protocol = int(32 + (color_temp / 100) * 24)
-            gm_value = 50  # Neutral GM
+        # Convert 0-100 internal scale to 32-56 protocol temp value
+        temp_protocol = int(32 + (color_temp / 100) * 24)
+        gm_value = 50  # Neutral green-magenta tint
 
+        if self.uses_infinity_protocol:
+            # Infinity: [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
             cmd = [0x78, INF_CCT_CMD, 0x0B]
             cmd.extend(self._get_mac_bytes())
             cmd.extend([STD_CCT_CMD, brightness, temp_protocol, gm_value, 0x04])
-            return self._add_checksum(cmd)
         else:
-            # Standard protocol - simpler format
-            # Format: [0x78, 0x87, 0x02, brightness, color_temp] + checksum
-            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, color_temp]
-            return self._add_checksum(cmd)
+            # Standard: [0x78, 0x87, 0x02, brightness, temp, GM] + checksum
+            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, temp_protocol, gm_value]
+
+        return self._add_checksum(cmd)
 
     def _build_hsi_command(self, hue: int, saturation: int, intensity: int) -> list[int]:
         """Build an HSI (hue, saturation, intensity) command for RGB lights.
