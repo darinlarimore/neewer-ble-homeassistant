@@ -298,28 +298,25 @@ class NeewerLightDevice:
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
         """Build a CCT (brightness + color temperature) command.
 
-        From NeewerLite-Python:
-        - Standard: [120, 135, 2, brightness, temp, GM] + checksum
-        - Infinity: [120, 144, 11, MAC(6), 135, brightness, temp, GM, 4] + checksum
-
         Args:
             brightness: 0-100
             color_temp: 0-100 (internal scale, maps to kelvin range)
         """
-        # Convert 0-100 to temp range (32-56 for 3200K-5600K)
-        temp_protocol = int(32 + (color_temp / 100) * 24)
-        gm_value = 50  # Neutral GM (green-magenta tint)
-
         if self.uses_infinity_protocol:
-            # Infinity: [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
+            # Infinity protocol needs temp conversion and GM value
+            # Format: [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
+            temp_protocol = int(32 + (color_temp / 100) * 24)
+            gm_value = 50  # Neutral GM
+
             cmd = [0x78, INF_CCT_CMD, 0x0B]
             cmd.extend(self._get_mac_bytes())
             cmd.extend([STD_CCT_CMD, brightness, temp_protocol, gm_value, 0x04])
+            return self._add_checksum(cmd)
         else:
-            # Standard: [0x78, 0x87, 0x02, brightness, temp, GM] + checksum
-            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, temp_protocol, gm_value]
-
-        return self._add_checksum(cmd)
+            # Standard protocol - simpler format
+            # Format: [0x78, 0x87, 0x02, brightness, color_temp] + checksum
+            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, color_temp]
+            return self._add_checksum(cmd)
 
     def _build_hsi_command(self, hue: int, saturation: int, intensity: int) -> list[int]:
         """Build an HSI (hue, saturation, intensity) command for RGB lights.
@@ -409,8 +406,8 @@ class NeewerLightDevice:
     async def turn_off(self) -> bool:
         """Turn off the light."""
         self._is_on = False
-        # Use brightness=0 CCT command (more reliable than power command for some lights)
-        cmd = self._build_cct_command(0, self._color_temp)
+        # Use power off command
+        cmd = self._build_power_command(on=False)
         return await self._send_command(cmd)
 
     async def set_brightness(self, brightness: int) -> bool:
