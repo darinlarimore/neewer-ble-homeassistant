@@ -404,8 +404,8 @@ class NeewerLightDevice:
     async def turn_off(self) -> bool:
         """Turn off the light."""
         self._is_on = False
-        # Use explicit power off command
-        cmd = self._build_power_command(on=False)
+        # Use brightness=0 CCT command (more reliable than power command for some lights)
+        cmd = self._build_cct_command(0, self._color_temp)
         return await self._send_command(cmd)
 
     async def set_brightness(self, brightness: int) -> bool:
