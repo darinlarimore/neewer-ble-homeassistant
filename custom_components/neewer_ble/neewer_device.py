@@ -11,6 +11,7 @@ from typing import Any
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
+from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
 
 from .const import (
     NEEWER_SERVICE_UUID,
@@ -226,45 +227,35 @@ class NeewerLightDevice:
         return cmd + [self._calculate_checksum(cmd)]
 
     async def connect(self) -> bool:
-        """Connect to the device."""
+        """Connect to the device using bleak-retry-connector for reliability."""
         if self.is_connected:
             return True
 
         async with self._lock:
-            for attempt in range(MAX_CONNECTION_RETRIES):
-                try:
-                    _LOGGER.debug(
-                        "Connecting to %s (attempt %d/%d)",
-                        self._address,
-                        attempt + 1,
-                        MAX_CONNECTION_RETRIES,
-                    )
-                    
-                    self._client = BleakClient(self._ble_device)
-                    await self._client.connect()
-                    self._connected = True
-                    _LOGGER.info("Connected to %s", self._name)
-                    return True
-                    
-                except BleakError as err:
-                    _LOGGER.warning(
-                        "Connection attempt %d failed: %s",
-                        attempt + 1,
-                        err,
-                    )
-                    if self._client:
-                        try:
-                            await self._client.disconnect()
-                        except Exception:
-                            pass
-                    self._client = None
-                    
-                    if attempt < MAX_CONNECTION_RETRIES - 1:
-                        await asyncio.sleep(CONNECTION_RETRY_DELAY)
+            try:
+                _LOGGER.debug("Connecting to %s", self._address)
 
-            _LOGGER.error("Failed to connect to %s after %d attempts", self._name, MAX_CONNECTION_RETRIES)
-            self._connected = False
-            return False
+                # Use bleak-retry-connector for reliable connection
+                self._client = await establish_connection(
+                    BleakClientWithServiceCache,
+                    self._ble_device,
+                    self._name,
+                    max_attempts=MAX_CONNECTION_RETRIES,
+                )
+                self._connected = True
+                _LOGGER.info("Connected to %s", self._name)
+                return True
+
+            except BleakError as err:
+                _LOGGER.error("Failed to connect to %s: %s", self._name, err)
+                self._client = None
+                self._connected = False
+                return False
+            except Exception as err:
+                _LOGGER.error("Unexpected error connecting to %s: %s", self._name, err)
+                self._client = None
+                self._connected = False
+                return False
 
     async def disconnect(self) -> None:
         """Disconnect from the device."""
