@@ -286,6 +286,9 @@ class NeewerLightDevice:
             _LOGGER.error("Failed to send command: %s", err)
             self._connected = False
             return False
+        finally:
+            # Always disconnect after sending to free up BLE connection slots
+            await self.disconnect()
 
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
         """Build a CCT (brightness + color temperature) command.
