@@ -299,8 +299,8 @@ class NeewerLightDevice:
         """Build a CCT (brightness + color temperature) command.
 
         From NeewerLite-Python:
-        - Standard: [120, 135, 2, brightness, temp, GM] + checksum
-          where temp is 32-56 (for 3200K-5600K), GM is 50 (neutral)
+        - Standard: [120, 135, 2, brightness, temp] + checksum
+          where temp is 32-56 (for 3200K-5600K)
         - Infinity: [120, 144, 11, MAC(6), 135, brightness, temp, GM, 4] + checksum
 
         Args:
@@ -317,8 +317,9 @@ class NeewerLightDevice:
             cmd.extend(self._get_mac_bytes())
             cmd.extend([STD_CCT_CMD, brightness, temp_protocol, gm_value, 0x04])
         else:
-            # Standard: [0x78, 0x87, 0x02, brightness, temp, GM] + checksum
-            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, temp_protocol, gm_value]
+            # Standard: [0x78, 0x87, 0x02, brightness, temp] + checksum
+            # Note: length byte 0x02 = 2 data bytes (no GM for standard protocol)
+            cmd = [0x78, STD_CCT_CMD, 0x02, brightness, temp_protocol]
 
         return self._add_checksum(cmd)
 
