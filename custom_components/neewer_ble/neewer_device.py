@@ -271,8 +271,13 @@ class NeewerLightDevice:
                     self._client = None
                     self._connected = False
 
-    async def _send_command(self, command: list[int]) -> bool:
-        """Send a command to the device."""
+    async def _send_command(self, command: list[int], keep_connected: bool = False) -> bool:
+        """Send a command to the device.
+
+        Args:
+            command: The command bytes to send
+            keep_connected: If True, don't disconnect after sending (for multi-command sequences)
+        """
         if not await self.connect():
             return False
 
@@ -294,8 +299,9 @@ class NeewerLightDevice:
             self._connected = False
             return False
         finally:
-            # Always disconnect after sending to free up BLE connection slots
-            await self.disconnect()
+            # Disconnect after sending to free up BLE connection slots (unless keeping connected)
+            if not keep_connected:
+                await self.disconnect()
 
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
         """Build a CCT (brightness + color temperature) command.
@@ -441,14 +447,18 @@ class NeewerLightDevice:
         else:
             # Standard protocol lights need separate brightness and temp commands
             # First send power on, then brightness, then temp (per NeewerLite-Python)
+            # Keep connection open between commands to avoid exhausting BLE slots
             power_cmd = self._build_power_command(on=True)
-            await self._send_command(power_cmd)
+            await self._send_command(power_cmd, keep_connected=True)
+            await asyncio.sleep(0.05)  # Small delay between commands
 
             bri_cmd = self._build_brightness_only_command(self._brightness)
-            await self._send_command(bri_cmd)
+            await self._send_command(bri_cmd, keep_connected=True)
+            await asyncio.sleep(0.05)
 
             temp_cmd = self._build_temp_only_command(self._color_temp)
-            return await self._send_command(temp_cmd)
+            result = await self._send_command(temp_cmd)  # Last command disconnects
+            return result
 
     async def turn_off(self) -> bool:
         """Turn off the light."""
