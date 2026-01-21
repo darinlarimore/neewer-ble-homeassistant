@@ -29,8 +29,10 @@ _LOGGER = logging.getLogger(__name__)
 
 # Standard protocol command bytes
 STD_POWER_CMD = 0x81   # 129 - Power on/off
-STD_CCT_CMD = 0x87     # 135 - CCT mode (brightness, temp, GM)
+STD_BRI_CMD = 0x82     # 130 - Brightness only (for old CCT lights)
+STD_TEMP_CMD = 0x83    # 131 - Color temperature only (for old CCT lights)
 STD_HSI_CMD = 0x86     # 134 - HSI mode (hue, sat, brightness)
+STD_CCT_CMD = 0x87     # 135 - CCT mode (brightness, temp, GM)
 
 # Infinity protocol command bytes
 INF_POWER_CMD = 0x8D   # 141 - Power on/off
@@ -368,6 +370,33 @@ class NeewerLightDevice:
 
         return self._add_checksum(cmd)
 
+    def _build_brightness_only_command(self, brightness: int) -> list[int]:
+        """Build a brightness-only command for old CCT lights.
+
+        From NeewerLite-Python:
+        - [120, 130, 1, brightness] + checksum
+
+        Args:
+            brightness: 0-100
+        """
+        cmd = [0x78, STD_BRI_CMD, 0x01, brightness]
+        return self._add_checksum(cmd)
+
+    def _build_temp_only_command(self, color_temp: int) -> list[int]:
+        """Build a color temperature-only command for old CCT lights.
+
+        From NeewerLite-Python:
+        - [120, 131, 1, temp] + checksum
+          where temp is 32-56 (for 3200K-5600K)
+
+        Args:
+            color_temp: 0-100 (internal scale, maps to kelvin range)
+        """
+        # Convert 0-100 internal scale to 32-56 protocol temp value
+        temp_protocol = int(32 + (color_temp / 100) * 24)
+        cmd = [0x78, STD_TEMP_CMD, 0x01, temp_protocol]
+        return self._add_checksum(cmd)
+
     def _kelvin_to_internal(self, kelvin: int) -> int:
         """Convert Kelvin to internal 0-100 scale."""
         min_k, max_k = self.color_temp_range
@@ -388,25 +417,38 @@ class NeewerLightDevice:
     ) -> bool:
         """Turn on the light with optional parameters."""
         self._is_on = True
-        
+
         if brightness is not None:
             self._brightness = max(0, min(100, brightness))
-        
+
         if color_temp_kelvin is not None:
             self._color_temp = self._kelvin_to_internal(color_temp_kelvin)
-        
+
         # For RGB lights with hue/saturation
         if self.supports_rgb and hue is not None:
             self._hue = max(0, min(360, hue))
             if saturation is not None:
                 self._saturation = max(0, min(100, saturation))
-            
+
             cmd = self._build_hsi_command(self._hue, self._saturation, self._brightness)
-        else:
-            # CCT mode
+            return await self._send_command(cmd)
+
+        # CCT mode
+        if self.uses_infinity_protocol:
+            # Infinity lights use combined CCT command
             cmd = self._build_cct_command(self._brightness, self._color_temp)
-        
-        return await self._send_command(cmd)
+            return await self._send_command(cmd)
+        else:
+            # Standard protocol lights need separate brightness and temp commands
+            # First send power on, then brightness, then temp (per NeewerLite-Python)
+            power_cmd = self._build_power_command(on=True)
+            await self._send_command(power_cmd)
+
+            bri_cmd = self._build_brightness_only_command(self._brightness)
+            await self._send_command(bri_cmd)
+
+            temp_cmd = self._build_temp_only_command(self._color_temp)
+            return await self._send_command(temp_cmd)
 
     async def turn_off(self) -> bool:
         """Turn off the light."""
@@ -419,17 +461,27 @@ class NeewerLightDevice:
         """Set brightness (0-100)."""
         self._brightness = max(0, min(100, brightness))
         self._is_on = brightness > 0
-        
-        cmd = self._build_cct_command(self._brightness, self._color_temp)
-        return await self._send_command(cmd)
+
+        if self.uses_infinity_protocol:
+            cmd = self._build_cct_command(self._brightness, self._color_temp)
+            return await self._send_command(cmd)
+        else:
+            # Standard protocol uses separate brightness command
+            cmd = self._build_brightness_only_command(self._brightness)
+            return await self._send_command(cmd)
 
     async def set_color_temp(self, kelvin: int) -> bool:
         """Set color temperature in Kelvin."""
         self._color_temp = self._kelvin_to_internal(kelvin)
-        
+
         if self._is_on:
-            cmd = self._build_cct_command(self._brightness, self._color_temp)
-            return await self._send_command(cmd)
+            if self.uses_infinity_protocol:
+                cmd = self._build_cct_command(self._brightness, self._color_temp)
+                return await self._send_command(cmd)
+            else:
+                # Standard protocol uses separate temp command
+                cmd = self._build_temp_only_command(self._color_temp)
+                return await self._send_command(cmd)
         return True
 
     async def set_rgb(self, hue: int, saturation: int, brightness: int | None = None) -> bool:
