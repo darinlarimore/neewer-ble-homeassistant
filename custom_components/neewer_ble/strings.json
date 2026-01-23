@@ -32,5 +32,17 @@
       "no_devices_found": "No Neewer lights found. Make sure your lights are powered on and Bluetooth is enabled.",
       "not_neewer_device": "This device does not appear to be a Neewer light."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Neewer Light Options",
+        "description": "Configure default values for this light.",
+        "data": {
+          "default_brightness": "Default Brightness (1-100%)",
+          "default_color_temp": "Default Color Temperature (Kelvin)"
+        }
+      }
+    }
   }
 }

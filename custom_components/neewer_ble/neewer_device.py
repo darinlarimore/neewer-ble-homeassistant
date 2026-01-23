@@ -46,7 +46,13 @@ INF_HSI_CMD = 0x8F     # 143 - HSI mode (NOT 0x91!)
 class NeewerLightDevice:
     """Represents a Neewer BLE light device."""
 
-    def __init__(self, ble_device: BLEDevice, model_info: dict | None = None) -> None:
+    def __init__(
+        self,
+        ble_device: BLEDevice,
+        model_info: dict | None = None,
+        default_brightness: int = 100,
+        default_color_temp: int = 3200,
+    ) -> None:
         """Initialize the Neewer light device."""
         self._ble_device = ble_device
         self._client: BleakClient | None = None
@@ -61,10 +67,14 @@ class NeewerLightDevice:
         # On macOS, bleak returns UUIDs, not real MAC addresses
         self._hw_mac_address: str | None = None
 
-        # State
+        # Default values (configurable via options)
+        self._default_brightness = default_brightness
+        self._default_color_temp = default_color_temp
+
+        # State - initialize to defaults
         self._is_on = False
-        self._brightness = 100
-        self._color_temp = 0  # Internal 0-100 scale (0 = warmest/3200K)
+        self._brightness = default_brightness
+        self._color_temp = self._kelvin_to_internal(default_color_temp)
         self._hue = 0
         self._saturation = 100
         self._connected = False
@@ -711,6 +721,17 @@ class NeewerLightDevice:
     def last_poll_success(self) -> bool:
         """Return True if the last poll was successful."""
         return self._last_poll_success
+
+    def set_defaults(self, brightness: int, color_temp_kelvin: int) -> None:
+        """Update default values (called when options change)."""
+        self._default_brightness = brightness
+        self._default_color_temp = color_temp_kelvin
+        _LOGGER.debug(
+            "Updated defaults for %s: brightness=%d, color_temp=%dK",
+            self._name,
+            brightness,
+            color_temp_kelvin,
+        )
 
 
 def _is_neewer_device(name: str) -> bool:

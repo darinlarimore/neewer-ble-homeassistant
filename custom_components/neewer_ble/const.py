@@ -67,6 +67,10 @@ SUPPORTED_MODELS = {
 DEFAULT_BRIGHTNESS = 100
 DEFAULT_COLOR_TEMP = 3200
 
+# Options flow config keys
+CONF_DEFAULT_BRIGHTNESS = "default_brightness"
+CONF_DEFAULT_COLOR_TEMP = "default_color_temp"
+
 # Color temperature conversion
 # Neewer uses a 0-100 scale internally for color temp
 # We need to map Kelvin to this scale

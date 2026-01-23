@@ -18,7 +18,14 @@ from homeassistant.components.bluetooth import (
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN, BLE_SCAN_TIMEOUT
+from .const import (
+    DOMAIN,
+    BLE_SCAN_TIMEOUT,
+    DEFAULT_BRIGHTNESS,
+    DEFAULT_COLOR_TEMP,
+    CONF_DEFAULT_BRIGHTNESS,
+    CONF_DEFAULT_COLOR_TEMP,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +39,13 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._discovered_devices: dict[str, BLEDevice] = {}
         self._discovery_info: BluetoothServiceInfoBleak | None = None
+
+    @staticmethod
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Get the options flow for this handler."""
+        return NeewerBLEOptionsFlow(config_entry)
 
     @staticmethod
     def _is_neewer_device(name: str) -> bool:
@@ -192,3 +206,42 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.error("BLE scan failed: %s", err)
 
         _LOGGER.debug("Discovered %d Neewer device(s)", len(self._discovered_devices))
+
+
+class NeewerBLEOptionsFlow(config_entries.OptionsFlow):
+    """Handle options flow for Neewer BLE Lights."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        # Get current values or defaults
+        current_brightness = self.config_entry.options.get(
+            CONF_DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS
+        )
+        current_color_temp = self.config_entry.options.get(
+            CONF_DEFAULT_COLOR_TEMP, DEFAULT_COLOR_TEMP
+        )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_DEFAULT_BRIGHTNESS,
+                        default=current_brightness,
+                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+                    vol.Optional(
+                        CONF_DEFAULT_COLOR_TEMP,
+                        default=current_color_temp,
+                    ): vol.All(vol.Coerce(int), vol.Range(min=2700, max=10000)),
+                }
+            ),
+        )
