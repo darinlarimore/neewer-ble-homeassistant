@@ -45,7 +45,7 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Get the options flow for this handler."""
-        return NeewerBLEOptionsFlow(config_entry)
+        return NeewerBLEOptionsFlow()
 
     @staticmethod
     def _is_neewer_device(name: str) -> bool:
@@ -210,10 +210,6 @@ class NeewerBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class NeewerBLEOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow for Neewer BLE Lights."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
