@@ -6,7 +6,11 @@ DOMAIN = "neewer_ble"
 # Neewer uses a custom GATT service for light control
 NEEWER_SERVICE_UUID = "69400001-b5a3-f393-e0a9-e50e24dcca99"
 NEEWER_WRITE_CHARACTERISTIC_UUID = "69400002-b5a3-f393-e0a9-e50e24dcca99"
-NEEWER_READ_CHARACTERISTIC_UUID = "69400003-b5a3-f393-e0a9-e50e24dcca99"
+NEEWER_NOTIFY_CHARACTERISTIC_UUID = "69400003-b5a3-f393-e0a9-e50e24dcca99"
+
+# Status query commands (per NeewerLite-Python)
+CMD_GET_POWER_STATUS = [0x78, 0x85, 0x00, 0xFD]  # Response type 2: [3]=1 ON, [3]=2 STANDBY
+CMD_GET_CHANNEL_STATUS = [0x78, 0x84, 0x00, 0xFC]  # Response type 1: current channel/mode
 
 # Supported light models with their specifications
 # Format based on NeewerLite-Python:

@@ -51,6 +51,7 @@ class NeewerBLELight(LightEntity):
 
     _attr_has_entity_name = True
     _attr_name = None  # Use device name
+    _attr_should_poll = True  # Enable polling for status updates
 
     def __init__(self, device: NeewerLightDevice, entry: ConfigEntry) -> None:
         """Initialize the light."""
@@ -106,9 +107,11 @@ class NeewerBLELight(LightEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if entity is available."""
-        # We consider it available even if not connected
-        # Connection happens on demand
+        """Return True if entity is available.
+
+        Always returns True since BLE connections are on-demand.
+        Polling helps sync state but doesn't determine availability.
+        """
         return True
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -147,3 +150,11 @@ class NeewerBLELight(LightEntity):
     async def async_will_remove_from_hass(self) -> None:
         """Handle removal from Home Assistant."""
         await self._device.disconnect()
+
+    async def async_update(self) -> None:
+        """Fetch new state data for this light.
+
+        This polls the device via BLE to get the actual power state.
+        """
+        _LOGGER.debug("Polling state for %s", self._device.name)
+        await self._device.async_update()

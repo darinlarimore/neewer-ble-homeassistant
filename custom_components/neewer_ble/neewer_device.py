@@ -16,6 +16,9 @@ from bleak_retry_connector import establish_connection, BleakClientWithServiceCa
 from .const import (
     NEEWER_SERVICE_UUID,
     NEEWER_WRITE_CHARACTERISTIC_UUID,
+    NEEWER_NOTIFY_CHARACTERISTIC_UUID,
+    CMD_GET_POWER_STATUS,
+    CMD_GET_CHANNEL_STATUS,
     SUPPORTED_MODELS,
     MAX_CONNECTION_RETRIES,
     CONNECTION_RETRY_DELAY,
@@ -65,6 +68,11 @@ class NeewerLightDevice:
         self._hue = 0
         self._saturation = 100
         self._connected = False
+
+        # For status polling via notifications
+        self._notify_data: bytes | None = None
+        self._notify_event = asyncio.Event()
+        self._last_poll_success = False
 
     def _detect_model(self) -> dict:
         """Detect model info from device name.
@@ -542,15 +550,159 @@ class NeewerLightDevice:
         if not self.supports_rgb:
             _LOGGER.warning("Device %s does not support RGB", self._name)
             return False
-        
+
         self._hue = max(0, min(360, hue))
         self._saturation = max(0, min(100, saturation))
         if brightness is not None:
             self._brightness = max(0, min(100, brightness))
-        
+
         self._is_on = True
         cmd = self._build_hsi_command(self._hue, self._saturation, self._brightness)
         return await self._send_command(cmd)
+
+    def _notify_callback(self, sender: int, data: bytearray) -> None:
+        """Handle notification data from the device.
+
+        Per NeewerLite-Python, response format:
+        - First byte (data[0]) is the response type
+        - Type 1 (0x01): Channel/mode status - data[3] contains current channel
+        - Type 2 (0x02): Power status - data[3]=1 ON, data[3]=2 STANDBY
+        """
+        _LOGGER.debug("Notification from %s: %s", self._name, [hex(b) for b in data])
+        self._notify_data = bytes(data)
+        self._notify_event.set()
+
+    async def _send_command_with_response(
+        self, command: list[int], timeout: float = 2.0
+    ) -> bytes | None:
+        """Send a command and wait for notification response.
+
+        Args:
+            command: The command bytes to send
+            timeout: How long to wait for response
+
+        Returns:
+            The notification response data, or None if failed/timeout
+        """
+        if not await self.connect():
+            return None
+
+        try:
+            # Clear any previous notification data
+            self._notify_data = None
+            self._notify_event.clear()
+
+            # Start notifications
+            await self._client.start_notify(
+                NEEWER_NOTIFY_CHARACTERISTIC_UUID, self._notify_callback
+            )
+
+            # Send the command
+            _LOGGER.debug(
+                "Sending query to %s: %s", self._name, [hex(b) for b in command]
+            )
+            await self._client.write_gatt_char(
+                NEEWER_WRITE_CHARACTERISTIC_UUID,
+                bytes(command),
+                response=False,
+            )
+
+            # Wait for notification response
+            try:
+                await asyncio.wait_for(self._notify_event.wait(), timeout=timeout)
+                return self._notify_data
+            except asyncio.TimeoutError:
+                _LOGGER.debug("Timeout waiting for response from %s", self._name)
+                return None
+            finally:
+                # Stop notifications
+                try:
+                    await self._client.stop_notify(NEEWER_NOTIFY_CHARACTERISTIC_UUID)
+                except Exception:
+                    pass
+
+        except BleakError as err:
+            _LOGGER.debug("Error querying %s: %s", self._name, err)
+            self._connected = False
+            return None
+        finally:
+            await self.disconnect()
+
+    async def async_get_power_status(self) -> bool | None:
+        """Query the device power status.
+
+        Returns:
+            True if ON, False if STANDBY/OFF, None if query failed
+        """
+        response = await self._send_command_with_response(CMD_GET_POWER_STATUS)
+        if response is None or len(response) < 4:
+            _LOGGER.debug("Failed to get power status from %s", self._name)
+            return None
+
+        # Per NeewerLite-Python: response type 2, data[3]=1 ON, data[3]=2 STANDBY
+        if response[0] == 0x02:  # Power status response
+            power_state = response[3]
+            is_on = power_state == 1
+            _LOGGER.debug(
+                "Power status for %s: %s (raw: %d)", self._name,
+                "ON" if is_on else "STANDBY", power_state
+            )
+            return is_on
+
+        _LOGGER.debug(
+            "Unexpected response type from %s: %s", self._name, [hex(b) for b in response]
+        )
+        return None
+
+    async def async_get_channel_status(self) -> dict | None:
+        """Query the device channel/mode status.
+
+        Returns:
+            Dict with channel info, or None if query failed
+        """
+        response = await self._send_command_with_response(CMD_GET_CHANNEL_STATUS)
+        if response is None or len(response) < 4:
+            _LOGGER.debug("Failed to get channel status from %s", self._name)
+            return None
+
+        # Per NeewerLite-Python: response type 1 contains channel/mode info
+        if response[0] == 0x01:
+            channel = response[3] if len(response) > 3 else 0
+            _LOGGER.debug("Channel status for %s: channel=%d", self._name, channel)
+            return {"channel": channel, "raw": list(response)}
+
+        _LOGGER.debug(
+            "Unexpected response type from %s: %s", self._name, [hex(b) for b in response]
+        )
+        return None
+
+    async def async_update(self) -> bool:
+        """Poll the device for current state.
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        try:
+            power_status = await self.async_get_power_status()
+            if power_status is not None:
+                self._is_on = power_status
+                self._last_poll_success = True
+                _LOGGER.debug(
+                    "Updated state for %s: is_on=%s", self._name, self._is_on
+                )
+                return True
+            else:
+                self._last_poll_success = False
+                return False
+        except Exception as err:
+            _LOGGER.debug("Error polling %s: %s", self._name, err)
+            self._last_poll_success = False
+            return False
+
+    @property
+    def last_poll_success(self) -> bool:
+        """Return True if the last poll was successful."""
+        return self._last_poll_success
 
 
 def _is_neewer_device(name: str) -> bool:
