@@ -631,6 +631,10 @@ class NeewerLightDevice:
     async def async_get_power_status(self) -> bool | None:
         """Query the device power status.
 
+        Response format: [0x78, type, len, data..., checksum]
+        - Type 0x02 = power status
+        - Data byte: 1=ON, 2=STANDBY
+
         Returns:
             True if ON, False if STANDBY/OFF, None if query failed
         """
@@ -639,8 +643,9 @@ class NeewerLightDevice:
             _LOGGER.debug("Failed to get power status from %s", self._name)
             return None
 
-        # Per NeewerLite-Python: response type 2, data[3]=1 ON, data[3]=2 STANDBY
-        if response[0] == 0x02:  # Power status response
+        # Response: [0x78, type, len, data, checksum]
+        # response[1] is the type, response[3] is the power state
+        if response[0] == 0x78 and response[1] == 0x02:  # Power status response
             power_state = response[3]
             is_on = power_state == 1
             _LOGGER.debug(
@@ -657,6 +662,9 @@ class NeewerLightDevice:
     async def async_get_channel_status(self) -> dict | None:
         """Query the device channel/mode status.
 
+        Response format: [0x78, type, len, data..., checksum]
+        - Type 0x01 = channel/mode status
+
         Returns:
             Dict with channel info, or None if query failed
         """
@@ -665,8 +673,8 @@ class NeewerLightDevice:
             _LOGGER.debug("Failed to get channel status from %s", self._name)
             return None
 
-        # Per NeewerLite-Python: response type 1 contains channel/mode info
-        if response[0] == 0x01:
+        # Response: [0x78, type, len, data..., checksum]
+        if response[0] == 0x78 and response[1] == 0x01:
             channel = response[3] if len(response) > 3 else 0
             _LOGGER.debug("Channel status for %s: channel=%d", self._name, channel)
             return {"channel": channel, "raw": list(response)}
