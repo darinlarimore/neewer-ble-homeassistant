@@ -65,7 +65,7 @@ SUPPORTED_MODELS = {
 
 # Default values
 DEFAULT_BRIGHTNESS = 100
-DEFAULT_COLOR_TEMP = 5600
+DEFAULT_COLOR_TEMP = 3200
 
 # Color temperature conversion
 # Neewer uses a 0-100 scale internally for color temp

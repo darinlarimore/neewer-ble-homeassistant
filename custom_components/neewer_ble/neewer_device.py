@@ -64,7 +64,7 @@ class NeewerLightDevice:
         # State
         self._is_on = False
         self._brightness = 100
-        self._color_temp = 56  # Internal 0-100 scale (maps to Kelvin)
+        self._color_temp = 0  # Internal 0-100 scale (0 = warmest/3200K)
         self._hue = 0
         self._saturation = 100
         self._connected = False
