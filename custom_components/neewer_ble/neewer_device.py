@@ -285,15 +285,17 @@ class NeewerLightDevice:
 
     async def disconnect(self) -> None:
         """Disconnect from the device."""
-        async with self._lock:
-            if self._client:
-                try:
-                    await self._client.disconnect()
-                except Exception as err:
-                    _LOGGER.debug("Error disconnecting: %s", err)
-                finally:
-                    self._client = None
-                    self._connected = False
+        if self._client:
+            try:
+                # Add timeout to prevent hanging on disconnect
+                await asyncio.wait_for(self._client.disconnect(), timeout=5.0)
+            except asyncio.TimeoutError:
+                _LOGGER.warning("Timeout disconnecting from %s, forcing cleanup", self._name)
+            except Exception as err:
+                _LOGGER.debug("Error disconnecting from %s: %s", self._name, err)
+            finally:
+                self._client = None
+                self._connected = False
 
     async def _send_command(self, command: list[int], keep_connected: bool = False) -> bool:
         """Send a command to the device.
@@ -305,6 +307,7 @@ class NeewerLightDevice:
         if not await self.connect():
             return False
 
+        success = False
         try:
             _LOGGER.info(
                 "Sending to %s: %s (decimal: %s)",
@@ -317,14 +320,15 @@ class NeewerLightDevice:
                 bytes(command),
                 response=False,
             )
+            success = True
             return True
         except BleakError as err:
             _LOGGER.error("Failed to send command: %s", err)
             self._connected = False
             return False
         finally:
-            # Disconnect after sending to free up BLE connection slots (unless keeping connected)
-            if not keep_connected:
+            # Always disconnect on error, or if not keeping connected
+            if not success or not keep_connected:
                 await self.disconnect()
 
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
@@ -470,13 +474,18 @@ class NeewerLightDevice:
         # - other lights use combined CCT command (format depends on light_type)
         if self.is_cct_only:
             # Old CCT-only lights need separate brightness and temp commands
-            # Keep connection open between commands to avoid exhausting BLE slots
-            bri_cmd = self._build_brightness_only_command(self._brightness)
-            await self._send_command(bri_cmd, keep_connected=True)
-            await asyncio.sleep(0.05)  # Small delay between commands
+            try:
+                bri_cmd = self._build_brightness_only_command(self._brightness)
+                if not await self._send_command(bri_cmd, keep_connected=True):
+                    return False
+                await asyncio.sleep(0.05)  # Small delay between commands
 
-            temp_cmd = self._build_temp_only_command(self._color_temp)
-            return await self._send_command(temp_cmd)
+                temp_cmd = self._build_temp_only_command(self._color_temp)
+                return await self._send_command(temp_cmd)
+            except Exception as err:
+                _LOGGER.error("Error in multi-command sequence: %s", err)
+                await self.disconnect()  # Ensure cleanup
+                return False
         else:
             # Standard/Infinity lights use combined CCT command
             cmd = self._build_cct_command(self._brightness, self._color_temp)
