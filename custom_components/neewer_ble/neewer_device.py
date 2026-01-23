@@ -483,10 +483,20 @@ class NeewerLightDevice:
             return await self._send_command(cmd)
 
     async def turn_off(self) -> bool:
-        """Turn off the light."""
+        """Turn off the light by setting brightness to 0.
+
+        Using brightness=0 instead of power off command because the power
+        command puts some lights into deep sleep with Bluetooth disabled.
+        """
         self._is_on = False
-        # Use power off command
-        cmd = self._build_power_command(on=False)
+
+        if self.is_cct_only:
+            # Old CCT-only lights use separate brightness command
+            cmd = self._build_brightness_only_command(0)
+        else:
+            # Standard/Infinity lights use CCT command with brightness=0
+            cmd = self._build_cct_command(0, self._color_temp)
+
         return await self._send_command(cmd)
 
     async def set_brightness(self, brightness: int) -> bool:
