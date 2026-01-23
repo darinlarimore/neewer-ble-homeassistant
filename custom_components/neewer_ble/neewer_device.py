@@ -67,22 +67,36 @@ class NeewerLightDevice:
         self._connected = False
 
     def _detect_model(self) -> dict:
-        """Detect model info from device name."""
+        """Detect model info from device name.
+
+        Light types per NeewerLite-Python:
+          0 = Standard: CCT uses [0x78, 0x87, 0x02, bri, temp] (5 bytes, no GM)
+          1 = Infinity: Full infinity protocol with MAC address
+          2 = Infinity-hybrid: CCT uses [0x78, 0x87, 0x03, bri, temp, GM] (6 bytes)
+
+        cct_only lights use separate 0x82 (brightness) and 0x83 (temp) commands.
+        """
         name = self._name.upper()
-        
-        # Check for model code in name (newer Infinity protocol devices)
+
+        # Remove common prefixes for matching
+        name_clean = name.replace("NEEWER-", "").replace("NEEWER", "").replace("-", "").replace(" ", "")
+
+        # Check for model code in name
         for code, info in SUPPORTED_MODELS.items():
-            if code in name or info["name"].upper() in name:
-                _LOGGER.debug("Detected model: %s", info["name"])
+            code_clean = code.upper().replace("-", "").replace(" ", "")
+            if code_clean in name_clean or name_clean in code_clean:
+                _LOGGER.debug("Detected model: %s (light_type=%d, cct_only=%s)",
+                              info["name"], info.get("light_type", 0), info.get("cct_only", False))
                 return info
-        
-        # Default to generic bi-color light
+
+        # Default to generic standard protocol light
         _LOGGER.debug("Unknown model, using defaults for: %s", self._name)
         return {
             "name": "Unknown",
             "rgb": False,
             "cct_range": (3200, 5600),
-            "infinity": False,
+            "cct_only": False,
+            "light_type": 0,
         }
 
     @property
@@ -106,9 +120,19 @@ class NeewerLightDevice:
         return self._model_info.get("rgb", False)
 
     @property
+    def light_type(self) -> int:
+        """Return the light type (0=standard, 1=infinity, 2=infinity-hybrid)."""
+        return self._model_info.get("light_type", 0)
+
+    @property
     def uses_infinity_protocol(self) -> bool:
-        """Return True if device uses the newer Infinity protocol."""
-        return self._model_info.get("infinity", False)
+        """Return True if device uses the full Infinity protocol (type 1)."""
+        return self.light_type == 1
+
+    @property
+    def is_cct_only(self) -> bool:
+        """Return True if device needs separate brightness/temp commands."""
+        return self._model_info.get("cct_only", False)
 
     @property
     def color_temp_range(self) -> tuple[int, int]:
@@ -306,10 +330,10 @@ class NeewerLightDevice:
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
         """Build a CCT (brightness + color temperature) command.
 
-        From NeewerLite-Python:
-        - Standard: [120, 135, 2, brightness, temp] + checksum
-          where temp is 32-56 (for 3200K-5600K)
-        - Infinity: [120, 144, 11, MAC(6), 135, brightness, temp, GM, 4] + checksum
+        From NeewerLite-Python, based on light_type:
+        - Type 0 (standard): [0x78, 0x87, 0x02, brightness, temp] + checksum (5 bytes, no GM)
+        - Type 1 (infinity): [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
+        - Type 2 (infinity-hybrid): [0x78, 0x87, 0x03, brightness, temp, GM] + checksum (6 bytes)
 
         Args:
             brightness: 0-100
@@ -319,14 +343,16 @@ class NeewerLightDevice:
         temp_protocol = int(32 + (color_temp / 100) * 24)
         gm_value = 50  # Neutral green-magenta tint
 
-        if self.uses_infinity_protocol:
-            # Infinity: [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
+        if self.light_type == 1:
+            # Infinity (type 1): [0x78, 0x90, 0x0B, MAC(6), 0x87, brightness, temp, GM, 0x04] + checksum
             cmd = [0x78, INF_CCT_CMD, 0x0B]
             cmd.extend(self._get_mac_bytes())
             cmd.extend([STD_CCT_CMD, brightness, temp_protocol, gm_value, 0x04])
+        elif self.light_type == 2:
+            # Infinity-hybrid (type 2): [0x78, 0x87, 0x03, brightness, temp, GM] + checksum
+            cmd = [0x78, STD_CCT_CMD, 0x03, brightness, temp_protocol, gm_value]
         else:
-            # Standard: [0x78, 0x87, 0x02, brightness, temp] + checksum
-            # Note: length byte 0x02 = 2 data bytes (no GM for standard protocol)
+            # Standard (type 0): [0x78, 0x87, 0x02, brightness, temp] + checksum (no GM!)
             cmd = [0x78, STD_CCT_CMD, 0x02, brightness, temp_protocol]
 
         return self._add_checksum(cmd)
@@ -439,26 +465,22 @@ class NeewerLightDevice:
             cmd = self._build_hsi_command(self._hue, self._saturation, self._brightness)
             return await self._send_command(cmd)
 
-        # CCT mode
-        if self.uses_infinity_protocol:
-            # Infinity lights use combined CCT command
-            cmd = self._build_cct_command(self._brightness, self._color_temp)
-            return await self._send_command(cmd)
-        else:
-            # Standard protocol lights need separate brightness and temp commands
-            # First send power on, then brightness, then temp (per NeewerLite-Python)
+        # CCT mode - per NeewerLite-Python:
+        # - cct_only lights (old bi-color) use separate 0x82/0x83 commands
+        # - other lights use combined CCT command (format depends on light_type)
+        if self.is_cct_only:
+            # Old CCT-only lights need separate brightness and temp commands
             # Keep connection open between commands to avoid exhausting BLE slots
-            power_cmd = self._build_power_command(on=True)
-            await self._send_command(power_cmd, keep_connected=True)
-            await asyncio.sleep(0.05)  # Small delay between commands
-
             bri_cmd = self._build_brightness_only_command(self._brightness)
             await self._send_command(bri_cmd, keep_connected=True)
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.05)  # Small delay between commands
 
             temp_cmd = self._build_temp_only_command(self._color_temp)
-            result = await self._send_command(temp_cmd)  # Last command disconnects
-            return result
+            return await self._send_command(temp_cmd)
+        else:
+            # Standard/Infinity lights use combined CCT command
+            cmd = self._build_cct_command(self._brightness, self._color_temp)
+            return await self._send_command(cmd)
 
     async def turn_off(self) -> bool:
         """Turn off the light."""
@@ -472,12 +494,13 @@ class NeewerLightDevice:
         self._brightness = max(0, min(100, brightness))
         self._is_on = brightness > 0
 
-        if self.uses_infinity_protocol:
-            cmd = self._build_cct_command(self._brightness, self._color_temp)
+        if self.is_cct_only:
+            # Old CCT-only lights use separate brightness command
+            cmd = self._build_brightness_only_command(self._brightness)
             return await self._send_command(cmd)
         else:
-            # Standard protocol uses separate brightness command
-            cmd = self._build_brightness_only_command(self._brightness)
+            # Standard/Infinity lights use combined CCT command
+            cmd = self._build_cct_command(self._brightness, self._color_temp)
             return await self._send_command(cmd)
 
     async def set_color_temp(self, kelvin: int) -> bool:
@@ -485,12 +508,13 @@ class NeewerLightDevice:
         self._color_temp = self._kelvin_to_internal(kelvin)
 
         if self._is_on:
-            if self.uses_infinity_protocol:
-                cmd = self._build_cct_command(self._brightness, self._color_temp)
+            if self.is_cct_only:
+                # Old CCT-only lights use separate temp command
+                cmd = self._build_temp_only_command(self._color_temp)
                 return await self._send_command(cmd)
             else:
-                # Standard protocol uses separate temp command
-                cmd = self._build_temp_only_command(self._color_temp)
+                # Standard/Infinity lights use combined CCT command
+                cmd = self._build_cct_command(self._brightness, self._color_temp)
                 return await self._send_command(cmd)
         return True
 

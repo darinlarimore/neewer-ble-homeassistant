@@ -9,33 +9,54 @@ NEEWER_WRITE_CHARACTERISTIC_UUID = "69400002-b5a3-f393-e0a9-e50e24dcca99"
 NEEWER_READ_CHARACTERISTIC_UUID = "69400003-b5a3-f393-e0a9-e50e24dcca99"
 
 # Supported light models with their specifications
-# Format: "model_code": {"name": str, "rgb": bool, "cct_range": (min_kelvin, max_kelvin), "infinity": bool}
+# Format based on NeewerLite-Python:
+#   "model_code": {
+#       "name": str,
+#       "rgb": bool,                    # Supports HSI/RGB mode
+#       "cct_range": (min_k, max_k),    # Color temperature range
+#       "cct_only": bool,               # True = use separate 0x82/0x83 commands (old CCT-only lights)
+#       "light_type": int,              # 0=standard, 1=infinity, 2=infinity-hybrid
+#   }
+#
+# Light types per NeewerLite-Python:
+#   0 = Old-style: CCT uses [0x78, 0x87, 0x02, bri, temp] (5 bytes, no GM)
+#   1 = Infinity: Full infinity protocol with MAC address embedded
+#   2 = Infinity-hybrid: CCT uses [0x78, 0x87, 0x03, bri, temp, GM] (6 bytes with GM)
+
 SUPPORTED_MODELS = {
-    # MS Series (COB lights)
-    "20220035": {"name": "MS150B", "rgb": False, "cct_range": (2700, 6500), "infinity": True},
-    "20230080": {"name": "MS60C", "rgb": True, "cct_range": (2700, 6500), "infinity": True},
-    
-    # RGB Panel lights
-    "NEEWER-RGB660": {"name": "RGB660", "rgb": True, "cct_range": (3200, 5600), "infinity": False},
-    "NEEWER-RGB660 PRO": {"name": "RGB660 PRO", "rgb": True, "cct_range": (3200, 5600), "infinity": False},
-    "NEEWER-RGB480": {"name": "RGB480", "rgb": True, "cct_range": (3200, 5600), "infinity": False},
-    "NEEWER-RGB530": {"name": "RGB530", "rgb": True, "cct_range": (3200, 5600), "infinity": False},
-    "NEEWER-RGB530 PRO": {"name": "RGB530 PRO", "rgb": True, "cct_range": (3200, 5600), "infinity": False},
-    
-    # SL/SNL Series (Bi-color panels)
-    "NEEWER-SL80": {"name": "SL-80", "rgb": False, "cct_range": (3200, 5600), "infinity": False},
-    "NEEWER-SNL660": {"name": "SNL-660", "rgb": False, "cct_range": (3200, 5600), "infinity": False},
-    
-    # GL Series (Key lights)
-    "20220001": {"name": "GL1", "rgb": False, "cct_range": (2900, 7000), "infinity": True},
-    
-    # CB Series
-    "20220051": {"name": "CB100C", "rgb": True, "cct_range": (2700, 6500), "infinity": True},
-    "20220055": {"name": "CB300B", "rgb": False, "cct_range": (2700, 6500), "infinity": True},
-    
-    # Light wands
-    "NEEWER-RGB1": {"name": "RGB1", "rgb": True, "cct_range": (3200, 5600), "infinity": False},
-    "NEEWER-TL60": {"name": "TL60 RGB", "rgb": True, "cct_range": (2700, 6500), "infinity": False},
+    # MS Series (COB lights) - Infinity protocol
+    "20220035": {"name": "MS150B", "rgb": False, "cct_range": (2700, 6500), "cct_only": False, "light_type": 1},
+    "20230080": {"name": "MS60C", "rgb": True, "cct_range": (2700, 6500), "cct_only": False, "light_type": 1},
+
+    # RGB Panel lights - Standard protocol (type 0)
+    "RGB660PRO": {"name": "RGB660 PRO", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
+    "RGB660": {"name": "RGB660", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
+    "RGB480": {"name": "RGB480", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
+    "RGB530": {"name": "RGB530", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
+    "RGB530PRO": {"name": "RGB530 PRO", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
+    "RGB176": {"name": "RGB176", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
+    "RGB960": {"name": "RGB960", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
+
+    # SL/SNL Series (Bi-color panels) - CCT-only lights use separate commands
+    "SL80": {"name": "SL-80", "rgb": False, "cct_range": (3200, 8500), "cct_only": True, "light_type": 0},
+    "SNL660": {"name": "SNL-660", "rgb": False, "cct_range": (3200, 5600), "cct_only": True, "light_type": 0},
+    "SNL530": {"name": "SNL-530", "rgb": False, "cct_range": (3200, 5600), "cct_only": True, "light_type": 0},
+    "SNL480": {"name": "SNL-480", "rgb": False, "cct_range": (3200, 5600), "cct_only": True, "light_type": 0},
+
+    # GL Series (Key lights) - Infinity protocol
+    "20220001": {"name": "GL1", "rgb": False, "cct_range": (2900, 7000), "cct_only": False, "light_type": 1},
+
+    # CB Series - Infinity protocol
+    "20220051": {"name": "CB100C", "rgb": True, "cct_range": (2700, 6500), "cct_only": False, "light_type": 1},
+    "20220055": {"name": "CB300B", "rgb": False, "cct_range": (2700, 6500), "cct_only": False, "light_type": 1},
+
+    # RGB512/RGB800 - Infinity-hybrid (type 2)
+    "RGB512": {"name": "RGB512", "rgb": True, "cct_range": (2500, 10000), "cct_only": False, "light_type": 2},
+    "RGB800": {"name": "RGB800", "rgb": True, "cct_range": (2500, 10000), "cct_only": False, "light_type": 2},
+
+    # Light wands - Standard protocol
+    "RGB1": {"name": "RGB1", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
+    "TL60": {"name": "TL60 RGB", "rgb": True, "cct_range": (2700, 6500), "cct_only": False, "light_type": 0},
 }
 
 # Default values
