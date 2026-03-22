@@ -124,7 +124,7 @@ class NeewerBLELight(LightEntity):
         brightness_pct = int(brightness / 2.55) if brightness is not None else None
         
         if hs_color is not None and self._device.supports_rgb:
-            # RGB mode
+            # Explicitly setting RGB mode
             hue, saturation = hs_color
             await self._device.set_rgb(
                 hue=int(hue),
@@ -132,11 +132,25 @@ class NeewerBLELight(LightEntity):
                 brightness=brightness_pct,
             )
             self._attr_color_mode = ColorMode.HS
-        else:
-            # CCT mode
+        elif color_temp_kelvin is not None:
+            # Explicitly setting CCT mode
             await self._device.turn_on(
                 brightness=brightness_pct,
                 color_temp_kelvin=color_temp_kelvin,
+            )
+            self._attr_color_mode = ColorMode.COLOR_TEMP
+        elif self._attr_color_mode == ColorMode.HS and self._device.supports_rgb:
+            # Only changing brightness (or turning on), keep HS mode
+            await self._device.set_rgb(
+                hue=int(self._device._hue),
+                saturation=int(self._device._saturation),
+                brightness=brightness_pct,
+            )
+        else:
+            # Default to CCT mode (or we were already in CCT mode)
+            await self._device.turn_on(
+                brightness=brightness_pct,
+                color_temp_kelvin=None,
             )
             self._attr_color_mode = ColorMode.COLOR_TEMP
         
