@@ -33,6 +33,19 @@
       "not_neewer_device": "This device does not appear to be a Neewer light."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Neewer Light Options",
+        "description": "Configure default values for this light.",
+        "data": {
+          "default_brightness": "Default Brightness (1-100%)",
+          "default_color_temp": "Default Color Temperature (Kelvin)",
+          "keep_connected": "Keep Connection Active (Disable to allow Neewer app control)"
+        }
+      }
+    }
+  },
   "entity": {
     "light": {
       "neewer_light": {

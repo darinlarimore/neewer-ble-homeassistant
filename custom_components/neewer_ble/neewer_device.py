@@ -52,6 +52,7 @@ class NeewerLightDevice:
         model_info: dict | None = None,
         default_brightness: int = 100,
         default_color_temp: int = 3200,
+        keep_connected: bool = False,
     ) -> None:
         """Initialize the Neewer light device."""
         self._ble_device = ble_device
@@ -70,6 +71,7 @@ class NeewerLightDevice:
         # Default values (configurable via options)
         self._default_brightness = default_brightness
         self._default_color_temp = default_color_temp
+        self._keep_connected = keep_connected
 
         # State - initialize to defaults
         self._is_on = False
@@ -346,7 +348,7 @@ class NeewerLightDevice:
             return False
         finally:
             # Always disconnect on error, or if not keeping connected
-            if not success or not keep_connected:
+            if not success or not (keep_connected or self._keep_connected):
                 await self.disconnect()
 
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
@@ -597,6 +599,7 @@ class NeewerLightDevice:
         if not await self.connect():
             return None
 
+        success = False
         try:
             # Clear any previous notification data
             self._notify_data = None
@@ -620,6 +623,7 @@ class NeewerLightDevice:
             # Wait for notification response
             try:
                 await asyncio.wait_for(self._notify_event.wait(), timeout=timeout)
+                success = True
                 return self._notify_data
             except asyncio.TimeoutError:
                 _LOGGER.debug("Timeout waiting for response from %s", self._name)
@@ -636,7 +640,8 @@ class NeewerLightDevice:
             self._connected = False
             return None
         finally:
-            await self.disconnect()
+            if not success or not self._keep_connected:
+                await self.disconnect()
 
     async def async_get_power_status(self) -> bool | None:
         """Query the device power status.
@@ -722,15 +727,17 @@ class NeewerLightDevice:
         """Return True if the last poll was successful."""
         return self._last_poll_success
 
-    def set_defaults(self, brightness: int, color_temp_kelvin: int) -> None:
+    def set_defaults(self, brightness: int, color_temp_kelvin: int, keep_connected: bool = False) -> None:
         """Update default values (called when options change)."""
         self._default_brightness = brightness
         self._default_color_temp = color_temp_kelvin
+        self._keep_connected = keep_connected
         _LOGGER.debug(
-            "Updated defaults for %s: brightness=%d, color_temp=%dK",
+            "Updated defaults for %s: brightness=%d, color_temp=%dK, keep_connected=%s",
             self._name,
             brightness,
             color_temp_kelvin,
+            keep_connected,
         )
 
 

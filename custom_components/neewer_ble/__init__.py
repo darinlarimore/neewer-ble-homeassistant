@@ -23,6 +23,7 @@ from .const import (
     DEFAULT_COLOR_TEMP,
     CONF_DEFAULT_BRIGHTNESS,
     CONF_DEFAULT_COLOR_TEMP,
+    CONF_KEEP_CONNECTED,
 )
 from .neewer_device import NeewerLightDevice
 
@@ -61,20 +62,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Get options with defaults
     default_brightness = entry.options.get(CONF_DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS)
     default_color_temp = entry.options.get(CONF_DEFAULT_COLOR_TEMP, DEFAULT_COLOR_TEMP)
+    keep_connected = entry.options.get(CONF_KEEP_CONNECTED, False)
 
     # Create the device handler
     device = NeewerLightDevice(
         ble_device,
         default_brightness=default_brightness,
         default_color_temp=default_color_temp,
+        keep_connected=keep_connected,
     )
     _LOGGER.info(
-        "Created device handler - Model: %s, RGB: %s, Infinity: %s, Default Bri: %d, Default CT: %dK",
+        "Created device handler - Model: %s, RGB: %s, Infinity: %s, Default Bri: %d, Default CT: %dK, Keep Conn: %s",
         device.model_name,
         device.supports_rgb,
         device.uses_infinity_protocol,
         default_brightness,
         default_color_temp,
+        keep_connected,
     )
 
     # Store the device
@@ -98,13 +102,15 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     default_brightness = entry.options.get(CONF_DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS)
     default_color_temp = entry.options.get(CONF_DEFAULT_COLOR_TEMP, DEFAULT_COLOR_TEMP)
+    keep_connected = entry.options.get(CONF_KEEP_CONNECTED, False)
 
-    device.set_defaults(default_brightness, default_color_temp)
+    device.set_defaults(default_brightness, default_color_temp, keep_connected)
     _LOGGER.info(
-        "Updated defaults for %s - Brightness: %d, Color Temp: %dK",
+        "Updated defaults for %s - Brightness: %d, Color Temp: %dK, Keep Conn: %s",
         device.name,
         default_brightness,
         default_color_temp,
+        keep_connected,
     )
 
 
