@@ -276,6 +276,9 @@ class NeewerLightDevice:
             return True
 
         async with self._lock:
+            if self.is_connected:
+                return True
+
             try:
                 _LOGGER.debug("Connecting to %s", self._address)
 
@@ -327,6 +330,14 @@ class NeewerLightDevice:
 
         success = False
         try:
+            if self._model_info.get("power_commands", False) and command[1] in (INF_CCT_CMD, INF_HSI_CMD):
+                await self._client.write_gatt_char(
+                    NEEWER_WRITE_CHARACTERISTIC_UUID,
+                    bytes(self._build_power_command(True)),
+                    response=False,
+                )
+                await asyncio.sleep(0.05)
+
             _LOGGER.info(
                 "Sending to %s: %s (decimal: %s)",
                 self._name,
@@ -345,8 +356,11 @@ class NeewerLightDevice:
             self._connected = False
             return False
         finally:
-            # Always disconnect on error, or if not keeping connected
-            if not success or not keep_connected:
+            # RGB1 stays reachable in standby; reuse its link until unload or error.
+            if not success or not (
+                keep_connected
+                or self._model_info.get("power_commands", False)
+            ):
                 await self.disconnect()
 
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:
@@ -411,13 +425,13 @@ class NeewerLightDevice:
 
         From NeewerLite-Python:
         - Standard: [120, 129, 1, 1/2] + checksum (1=on, 2=off)
-        - Infinity: [120, 141, 8, MAC(6), 129, 1/0] + checksum (1=on, 0=off)
+        - Infinity: [120, 141, 8, MAC(6), 129, 1/2] + checksum (1=on, 2=off)
         """
         if self.uses_infinity_protocol:
             # Infinity: [0x78, 0x8D, 0x08, MAC(6), 0x81, on/off] + checksum
             cmd = [0x78, INF_POWER_CMD, 0x08]
             cmd.extend(self._get_mac_bytes())
-            cmd.extend([STD_POWER_CMD, 1 if on else 0])
+            cmd.extend([STD_POWER_CMD, 1 if on else 2])
         else:
             # Standard: [0x78, 0x81, 0x01, on/off] + checksum (1=on, 2=off)
             cmd = [0x78, STD_POWER_CMD, 0x01, 1 if on else 2]
@@ -510,14 +524,16 @@ class NeewerLightDevice:
             return await self._send_command(cmd)
 
     async def turn_off(self) -> bool:
-        """Turn off the light by setting brightness to 0.
+        """Turn off the light using its model's supported power behaviour.
 
-        Using brightness=0 instead of power off command because the power
-        command puts some lights into deep sleep with Bluetooth disabled.
+        Keep the brightness-zero workaround for lights whose power command
+        disables Bluetooth. RGB1 needs its power command to extinguish the LEDs.
         """
         self._is_on = False
 
-        if self.is_cct_only:
+        if self._model_info.get("power_commands", False):
+            cmd = self._build_power_command(False)
+        elif self.is_cct_only:
             # Old CCT-only lights use separate brightness command
             cmd = self._build_brightness_only_command(0)
         else:
