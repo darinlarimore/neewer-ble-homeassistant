@@ -276,6 +276,9 @@ class NeewerLightDevice:
             return True
 
         async with self._lock:
+            if self.is_connected:
+                return True
+
             try:
                 _LOGGER.debug("Connecting to %s", self._address)
 
@@ -353,8 +356,11 @@ class NeewerLightDevice:
             self._connected = False
             return False
         finally:
-            # Always disconnect on error, or if not keeping connected
-            if not success or not keep_connected:
+            # Reuse RGB1's connection while on; release it on off or error.
+            if not success or not (
+                keep_connected
+                or (self._model_info.get("power_commands", False) and self._is_on)
+            ):
                 await self.disconnect()
 
     def _build_cct_command(self, brightness: int, color_temp: int) -> list[int]:

@@ -1,11 +1,12 @@
 """RGB1 protocol regressions, without starting Home Assistant."""
 
+import asyncio
 import importlib
 from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from bleak.backends.device import BLEDevice
 
@@ -58,6 +59,42 @@ class RGB1Tests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(writes[1].args[1][1], 0x8F if colour else 0x90)
                 self.assertEqual(writes[1].args[1][3:9], bytes.fromhex("12 34 56 78 9a bc"))
                 self.assertTrue(device.is_on)
+
+    async def test_rgb1_reuses_one_connection_until_powered_off(self):
+        device, client = self.make_device()
+        device._client = None
+        device._connected = False
+        with patch.object(protocol, "establish_connection", AsyncMock(return_value=client)) as connect:
+            self.assertTrue(await device.set_rgb(120, 100, 30))
+            self.assertTrue(await device.set_rgb(240, 100, 40))
+            connect.assert_awaited_once()
+            client.disconnect.assert_not_awaited()
+            self.assertTrue(await device.turn_off())
+            client.disconnect.assert_awaited_once()
+            self.assertTrue(await device.turn_on(brightness=30))
+            self.assertEqual(connect.await_count, 2)
+            self.assertTrue(await device.turn_off())
+
+    async def test_simultaneous_commands_share_the_initial_connection(self):
+        device, client = self.make_device()
+        device._client = None
+        device._connected = False
+
+        async def establish(*args, **kwargs):
+            await asyncio.sleep(0)
+            return client
+
+        with patch.object(protocol, "establish_connection", AsyncMock(side_effect=establish)) as connect:
+            self.assertEqual(await asyncio.gather(device.connect(), device.connect()), [True, True])
+            connect.assert_awaited_once()
+        await device.disconnect()
+
+    async def test_write_failure_releases_the_connection(self):
+        device, client = self.make_device()
+        client.write_gatt_char.side_effect = protocol.BleakError("Connection lost")
+        self.assertFalse(await device.set_rgb(120, 100, 30))
+        client.disconnect.assert_awaited_once()
+        self.assertFalse(device.is_connected)
 
     async def test_existing_models_keep_brightness_zero_off(self):
         device, client = self.make_device("NEEWER-RGB660")
