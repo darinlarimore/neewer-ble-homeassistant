@@ -43,7 +43,7 @@ class RGB1Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data, bytes.fromhex("78 8d 08 12 34 56 78 9a bc 81 02 fa"))
         self.assertEqual(device.brightness, 100)
         self.assertFalse(device.is_on)
-        client.disconnect.assert_awaited_once()
+        client.disconnect.assert_not_awaited()
 
     async def test_colour_and_white_commands_wake_the_rgb1(self):
         for colour in [False, True]:
@@ -60,7 +60,7 @@ class RGB1Tests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(writes[1].args[1][3:9], bytes.fromhex("12 34 56 78 9a bc"))
                 self.assertTrue(device.is_on)
 
-    async def test_rgb1_reuses_one_connection_until_powered_off(self):
+    async def test_rgb1_reuses_connection_across_adjustments_and_standby(self):
         device, client = self.make_device()
         device._client = None
         device._connected = False
@@ -70,10 +70,14 @@ class RGB1Tests(unittest.IsolatedAsyncioTestCase):
             connect.assert_awaited_once()
             client.disconnect.assert_not_awaited()
             self.assertTrue(await device.turn_off())
+            client.disconnect.assert_not_awaited()
+            self.assertTrue(await device.turn_on(brightness=30))
+            connect.assert_awaited_once()
+            await device.disconnect()
             client.disconnect.assert_awaited_once()
             self.assertTrue(await device.turn_on(brightness=30))
             self.assertEqual(connect.await_count, 2)
-            self.assertTrue(await device.turn_off())
+            await device.disconnect()
 
     async def test_simultaneous_commands_share_the_initial_connection(self):
         device, client = self.make_device()

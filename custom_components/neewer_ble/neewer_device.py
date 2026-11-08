@@ -356,10 +356,10 @@ class NeewerLightDevice:
             self._connected = False
             return False
         finally:
-            # Reuse RGB1's connection while on; release it on off or error.
+            # RGB1 stays reachable in standby; reuse its link until unload or error.
             if not success or not (
                 keep_connected
-                or (self._model_info.get("power_commands", False) and self._is_on)
+                or self._model_info.get("power_commands", False)
             ):
                 await self.disconnect()
 
