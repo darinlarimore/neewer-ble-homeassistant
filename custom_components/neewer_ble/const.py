@@ -58,8 +58,8 @@ SUPPORTED_MODELS = {
     "RGB512": {"name": "RGB512", "rgb": True, "cct_range": (2500, 10000), "cct_only": False, "light_type": 2},
     "RGB800": {"name": "RGB800", "rgb": True, "cct_range": (2500, 10000), "cct_only": False, "light_type": 2},
 
-    # Light wands - Standard protocol
-    "RGB1": {"name": "RGB1", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
+    # Light wands
+    "20200015": {"name": "RGB1", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 1, "power_commands": True},
     "TL60": {"name": "TL60 RGB", "rgb": True, "cct_range": (2700, 6500), "cct_only": False, "light_type": 0},
 }
 

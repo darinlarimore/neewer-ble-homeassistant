@@ -10,6 +10,7 @@ This integration supports Neewer lights that use Bluetooth for control, includin
 
 ### Tested
 - **MS150B** - 130W Bi-Color COB Light
+- **RGB1** - Light Wand (`NW-20200015`, Infinity protocol; tested through an ESPHome Bluetooth proxy)
 
 ### Should Work (Untested)
 - MS60C - 65W RGB COB Light
@@ -19,7 +20,6 @@ This integration supports Neewer lights that use Bluetooth for control, includin
 - SNL-660 - Bi-Color Panel
 - GL1 - Key Light
 - CB100C / CB300B - COB Lights
-- RGB1 - Light Wand
 - TL60 RGB - Tube Light
 
 ## Features
