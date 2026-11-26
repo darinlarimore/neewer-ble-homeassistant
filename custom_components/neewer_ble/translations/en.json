@@ -39,5 +39,18 @@
         "name": "Light"
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Neewer Light Options",
+        "description": "Configure default values for this light. While the connection is open, commands arrive at once but the Neewer app cannot connect to the light.",
+        "data": {
+          "default_brightness": "Default Brightness (1-100%)",
+          "default_color_temp": "Default Color Temperature (Kelvin)",
+          "disconnect_after": "Keep the Bluetooth connection open (seconds after the last command, 0 = close it every time)"
+        }
+      }
+    }
   }
 }

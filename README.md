@@ -4,12 +4,36 @@
 
 A Home Assistant custom integration for controlling Neewer LED lights via Bluetooth Low Energy (BLE).
 
+## This fork
+
+A fork of [darinlarimore/neewer-ble-homeassistant](https://github.com/darinlarimore/neewer-ble-homeassistant)
+(0.2.1), made for two CB60B lights. What it changes:
+
+- **The connection stays open.** The original connects for every command, which takes 3 s or more. Here the
+  connection is kept for 10 minutes after the last command (an option per light; 0 closes it every time), and a
+  command on an open connection takes a few milliseconds. While it is open the Neewer app cannot connect.
+- **Commands for one light never overlap.** When several arrive while one is being sent, only the latest state
+  goes out, so a slider that is dragged quickly ends where it was released.
+- **CB60B support**: the full 2700–6500 K range, its 12 built-in effects, and a real power off (standby) instead
+  of brightness 0. Of the effects, only Lightning was checked by eye; the others use the same command with the
+  parameters NeewerLite-Python documents.
+- **Colour temperature is sent as Kelvin / 100** for every model, so lights with a range other than 3200–5600 K
+  get the value that was asked for (the original always sent 3200–5600 K).
+- **Brightness and colour temperature come back as they were set**: 30 % stays 30 %, and the temperature shows the
+  100 K step the light took.
+- **A light that does not answer** raises an error and keeps its previous state, instead of showing the new state
+  as if it had worked. It shows as unavailable when it is not connected and has not been heard on Bluetooth.
+
+Only the CB60B was tested with this fork. The other models keep their commands; what changes for them is the
+connection handling and the temperature byte.
+
 ## Supported Devices
 
 This integration supports Neewer lights that use Bluetooth for control, including:
 
 ### Tested
-- **MS150B** - 130W Bi-Color COB Light
+- **CB60B** - 70W Bi-Color COB Light (this fork)
+- **MS150B** - 130W Bi-Color COB Light (original integration)
 
 ### Should Work (Untested)
 - MS60C - 65W RGB COB Light
@@ -27,6 +51,7 @@ This integration supports Neewer lights that use Bluetooth for control, includin
 - **Brightness control** (0-100%)
 - **Color temperature control** (varies by model, typically 2700K-6500K)
 - **RGB color control** (for supported models)
+- **Built-in effects** (CB60B: lightning, paparazzi, candlelight, TV screen and eight more)
 - **Auto-discovery** via Home Assistant's Bluetooth integration
 - **Manual device entry** for devices not auto-discovered
 
@@ -43,7 +68,7 @@ This integration supports Neewer lights that use Bluetooth for control, includin
 1. Open HACS in Home Assistant
 2. Click the three dots in the top right corner
 3. Select "Custom repositories"
-4. Add this repository URL: `https://github.com/darinlarimore/neewer-ble-homeassistant`
+4. Add this repository URL: `https://github.com/dani-carbonell/neewer-ble-homeassistant`
 5. Select "Integration" as the category
 6. Click "Add"
 7. Search for "Neewer BLE" and install it

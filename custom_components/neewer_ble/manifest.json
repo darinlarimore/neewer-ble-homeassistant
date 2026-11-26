@@ -1,15 +1,23 @@
 {
   "domain": "neewer_ble",
   "name": "Neewer BLE Lights",
-  "codeowners": ["@darinlarimore"],
+  "codeowners": [
+    "@darinlarimore",
+    "@dani-carbonell"
+  ],
   "config_flow": true,
-  "dependencies": [],
-  "documentation": "https://github.com/darinlarimore/neewer-ble-homeassistant",
+  "dependencies": [
+    "bluetooth_adapters"
+  ],
+  "documentation": "https://github.com/dani-carbonell/neewer-ble-homeassistant",
   "integration_type": "device",
-  "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/darinlarimore/neewer-ble-homeassistant/issues",
-  "requirements": ["bleak>=0.21.0", "bleak-retry-connector>=3.0.0"],
-  "version": "0.2.1",
+  "iot_class": "assumed_state",
+  "issue_tracker": "https://github.com/dani-carbonell/neewer-ble-homeassistant/issues",
+  "requirements": [
+    "bleak>=0.21.0",
+    "bleak-retry-connector>=3.0.0"
+  ],
+  "version": "0.3.0",
   "bluetooth": [
     {
       "local_name": "NEEWER*"
