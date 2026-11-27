@@ -18,6 +18,20 @@ jobs:
         with:
           category: "integration"
 
+  tests:
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: read
+    steps:
+      - uses: "actions/checkout@v4"
+      - uses: "actions/setup-python@v5"
+        with:
+          python-version: "3.13"
+      - name: Install the Bluetooth libraries the device module imports
+        run: pip install bleak bleak-retry-connector
+      - name: Protocol tests
+        run: python -m unittest discover -s tests -v
+
   validate-hassfest:
     runs-on: "ubuntu-latest"
     permissions:

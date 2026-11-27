@@ -537,13 +537,14 @@ class NeewerLightDevice:
 
         From NeewerLite-Python:
         - Standard: [120, 129, 1, 1/2] + checksum (1=on, 2=off)
-        - Infinity: [120, 141, 8, MAC(6), 129, 1/0] + checksum (1=on, 0=off)
+        - Infinity: [120, 141, 8, MAC(6), 129, 1/2] + checksum (1=on, 2=off; 0 is ignored,
+          checked on an RGB1 in #11)
         """
         if self.uses_infinity_protocol:
             # Infinity: [0x78, 0x8D, 0x08, MAC(6), 0x81, on/off] + checksum
             cmd = [0x78, INF_POWER_CMD, 0x08]
             cmd.extend(self._get_mac_bytes())
-            cmd.extend([STD_POWER_CMD, 1 if on else 0])
+            cmd.extend([STD_POWER_CMD, 1 if on else 2])
         else:
             # Standard: [0x78, 0x81, 0x01, on/off] + checksum (1=on, 2=off)
             cmd = [0x78, STD_POWER_CMD, 0x01, 1 if on else 2]
