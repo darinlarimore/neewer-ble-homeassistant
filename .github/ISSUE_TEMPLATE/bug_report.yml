@@ -1,0 +1,40 @@
+name: Bug report
+description: Something that used to work, or should work on a tested light, does not.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Light model and Bluetooth name
+      placeholder: CB60B, NW-20220014&0A1B2C
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Integration version
+      description: And the last version where it worked, if you know it.
+      placeholder: 0.3.0 (worked in 0.2.1)
+    validations:
+      required: true
+  - type: input
+    id: home_assistant
+    attributes:
+      label: Home Assistant version and Bluetooth setup
+      placeholder: 2026.11.2, built-in adapter
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log
+      description: See CONTRIBUTING.md for how to turn on debug logging. Paste the lines that mention neewer_ble.
+      render: text

@@ -1,0 +1,76 @@
+name: Light test report
+description: Tell us how the integration behaves on your Neewer light, working or not. This is the most useful thing you can send.
+title: "[Light report] <model>"
+labels: ["light-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing. Most models in this integration are set up from protocol notes and have never been tried on real hardware, so a report from your light, good or bad, moves it forward.
+  - type: input
+    id: model
+    attributes:
+      label: Light model
+      description: As printed on the light or its box.
+      placeholder: CB60B
+    validations:
+      required: true
+  - type: input
+    id: bluetooth_name
+    attributes:
+      label: Bluetooth name
+      description: The name the light advertises, shown in Settings > Devices & services > Bluetooth > Advertisement monitor, or in any BLE scanner app. It carries the model code.
+      placeholder: NW-20220014&0A1B2C
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Integration version
+      placeholder: 0.3.0
+    validations:
+      required: true
+  - type: input
+    id: home_assistant
+    attributes:
+      label: Home Assistant version and Bluetooth setup
+      description: The Home Assistant version, and whether you use a built-in adapter, a USB dongle or an ESPHome Bluetooth proxy.
+      placeholder: 2026.11.2, ESPHome Bluetooth proxy
+    validations:
+      required: true
+  - type: dropdown
+    id: detected
+    attributes:
+      label: Was the model detected correctly?
+      description: The device page in Home Assistant shows the model the integration picked.
+      options:
+        - "Yes"
+        - "No, it shows a different model"
+        - "No, it shows Unknown"
+    validations:
+      required: true
+  - type: checkboxes
+    id: works
+    attributes:
+      label: What works
+      description: Tick everything that behaves correctly on the light itself, not only in Home Assistant.
+      options:
+        - label: Turn on
+        - label: Turn off
+        - label: Brightness
+        - label: Color temperature (the light matches the Kelvin value you set)
+        - label: RGB color (leave empty on a bi-color light)
+        - label: Effects (leave empty if the light has none)
+        - label: The second command after the first arrives quickly (the connection stays open)
+        - label: The light shows as unavailable when it has no power
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What does not work
+      description: What you did, what you expected and what the light did instead.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log
+      description: Turn on debug logging for the integration (see CONTRIBUTING.md), repeat the command, and paste the lines that mention neewer_ble. The "Sending to ..." lines show the exact bytes.
+      render: text

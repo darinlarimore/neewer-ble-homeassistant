@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: How to test your light and contribute
+    url: https://github.com/darinlarimore/neewer-ble-homeassistant/blob/main/CONTRIBUTING.md
+    about: Finding the Bluetooth name, debug logging, adding a model, and what a pull request needs.

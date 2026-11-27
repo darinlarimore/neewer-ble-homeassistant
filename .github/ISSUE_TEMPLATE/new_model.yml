@@ -1,0 +1,51 @@
+name: Support a new light
+description: Your Neewer light is not in the supported list, or shows up as Unknown.
+title: "[New light] <model>"
+labels: ["new-model"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If you are comfortable editing one line of Python, CONTRIBUTING.md shows how to add the model yourself and try it. Either way, the details below are what is needed.
+  - type: input
+    id: model
+    attributes:
+      label: Light model
+      placeholder: PL60C
+    validations:
+      required: true
+  - type: input
+    id: bluetooth_name
+    attributes:
+      label: Bluetooth name
+      description: The exact name the light advertises. It carries the model code the integration matches on.
+      placeholder: NW-20230021&0A1B2C
+    validations:
+      required: true
+  - type: input
+    id: range
+    attributes:
+      label: Color temperature range
+      description: From the light's own display, manual or the Neewer app.
+      placeholder: 2500 K to 10000 K
+    validations:
+      required: true
+  - type: dropdown
+    id: rgb
+    attributes:
+      label: Does it have RGB color?
+      options:
+        - "No, bi-color only"
+        - "Yes"
+    validations:
+      required: true
+  - type: textarea
+    id: now
+    attributes:
+      label: What happens today
+      description: Is it discovered? Does anything respond (on, off, brightness)?
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else
+      description: Whether it works in NeewerLite or NeewerLite-Python and under which model there, effects it has, a link to the product page.

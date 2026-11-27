@@ -2,26 +2,39 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
+[![Validate](https://github.com/darinlarimore/neewer-ble-homeassistant/actions/workflows/validate.yml/badge.svg)](https://github.com/darinlarimore/neewer-ble-homeassistant/actions/workflows/validate.yml)
+
 A Home Assistant custom integration for controlling Neewer LED lights via Bluetooth Low Energy (BLE).
+
+## Status: a work in progress, built by the people who own the lights
+
+Neewer does not publish its Bluetooth protocol. Every model here is set up from the
+reverse-engineering work in NeewerLite and NeewerLite-Python, and **only two have been tried on
+real hardware**. The rest are best guesses that need someone who owns the light.
+
+**If you have a Neewer light, please tell us how it behaves**, working or not:
+[send a light test report](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/new?template=light_report.yml).
+It takes a few minutes and is the most useful contribution there is. To add a model or fix
+something yourself, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Supported Devices
 
-This integration supports Neewer lights that use Bluetooth for control, including:
+| Light | Type | Status |
+|---|---|---|
+| **CB60B** | 70W bi-color COB | Tested on 0.3.0 (two units), including effects |
+| **MS150B** | 130W bi-color COB | Tested up to 0.2.1; not yet re-tested on 0.3.0 |
+| CB100C | RGB COB | Reported: color resets when brightness changes ([#4](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/4)); 0.3.0 should fix it, unconfirmed |
+| RGB168 | RGB panel | Reported: inconsistent response ([#8](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/8)) |
+| PL60C, AP150C | | Reported: discovered but no control ([#9](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/9)) |
+| SNL1320 | Bi-color panel | Reported: discovered but no control ([#10](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/10)) |
+| MS60C, CB300B, GL1 | COB and key lights | Untested |
+| RGB660, RGB660 PRO, RGB480, RGB530, RGB530 PRO, RGB176, RGB960 | RGB panels | Untested |
+| RGB512, RGB800 | RGB panels | Untested |
+| SL-80, SNL-660, SNL-530, SNL-480 | Bi-color panels | Untested |
+| RGB1, TL60 RGB | Wand and tube | Untested |
 
-### Tested
-- **MS150B** - 130W Bi-Color COB Light
-- **CB60B** - 70W Bi-Color COB Light
-
-### Should Work (Untested)
-- MS60C - 65W RGB COB Light
-- RGB660 / RGB660 PRO - Panel Lights
-- RGB480 / RGB530 - Panel Lights
-- SL-80 - Bi-Color Panel
-- SNL-660 - Bi-Color Panel
-- GL1 - Key Light
-- CB100C / CB300B - COB Lights
-- RGB1 - Light Wand
-- TL60 RGB - Tube Light
+A light that is not in the table is set up as a generic bi-color light (3200 K to 5600 K). It may
+work, partly work or not respond: [ask for it to be added](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/new?template=new_model.yml).
 
 ## Features
 
@@ -69,6 +82,16 @@ If your Neewer light is powered on and in range, Home Assistant should automatic
 2. Click **Add Integration**
 3. Search for "Neewer BLE"
 4. Select your light from the discovered devices, or enter the Bluetooth address manually
+
+### Options
+
+Each light has options under **Configure** on its page:
+
+- **Default brightness** and **default color temperature**: what the light starts at.
+- **Keep the Bluetooth connection open**: how many seconds the connection stays open after a
+  command (10 minutes by default). While it is open, the next command arrives at once instead of
+  after a reconnect of about 3 seconds, **but the Neewer phone app cannot connect to the light**.
+  Set it to 0 to close the connection after every command.
 
 ## Usage
 
@@ -129,18 +152,22 @@ Bluetooth connections can be finicky. Try:
 
 ### Light Not Responding
 
-Some Neewer lights use different BLE protocols. If your light isn't responding:
-1. Open an issue with your light model
-2. Include the Bluetooth device name (visible in the Neewer app or via a BLE scanner)
+Some Neewer lights use different BLE protocols. If your light isn't responding,
+[send a light test report](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/new?template=light_report.yml)
+with its model and Bluetooth name. [CONTRIBUTING.md](CONTRIBUTING.md) shows where to find the name
+and how to turn on debug logging.
+
+### The Neewer App Cannot Connect
+
+Home Assistant keeps its connection to the light open for a while after a command, and a light
+accepts one connection at a time. Set **Keep the Bluetooth connection open** to 0 in the light's
+options, or wait for it to close.
 
 ## Contributing
 
-Contributions are welcome! If you have a Neewer light that isn't working:
-
-1. Fork this repository
-2. Add your light's model info to `const.py`
-3. Test the integration
-4. Submit a pull request
+This is a community effort: the integration only gets better on a model when someone who owns it
+reports back. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to test your light, add a model, or
+send a fix. Thanks to everyone who has sent reports and pull requests.
 
 ## Protocol Information
 
