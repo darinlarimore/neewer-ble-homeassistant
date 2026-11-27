@@ -322,6 +322,9 @@ class NeewerLightDevice:
             return
         _LOGGER.debug("Disconnected from %s", self._name)
         self._client = None
+        # The light may have lost mains power and be back in standby when it returns:
+        # send the power command again on the next "on".
+        self._light_power = None
         self._cancel_disconnect_timer()
         self._mark_reached()
         self._notify_listeners()

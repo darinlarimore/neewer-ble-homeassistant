@@ -1,0 +1,31 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  validate-hacs:
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: HACS validation
+        uses: "hacs/action@main"
+        with:
+          category: "integration"
+          # The integration has no brand icon yet (custom_components/neewer_ble/brand/icon.png).
+          # Remove this line once it does: the HACS default store accepts no ignores.
+          ignore: "brands"
+
+  validate-hassfest:
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: read
+    steps:
+      - uses: "actions/checkout@v4"
+      - name: Hassfest validation
+        uses: "home-assistant/actions/hassfest@master"

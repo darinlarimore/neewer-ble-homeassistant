@@ -1,6 +1,14 @@
 {
   "domain": "neewer_ble",
   "name": "Neewer BLE Lights",
+  "bluetooth": [
+    {
+      "local_name": "NEEWER*"
+    },
+    {
+      "local_name": "NW-*"
+    }
+  ],
   "codeowners": [
     "@darinlarimore"
   ],
@@ -16,13 +24,5 @@
     "bleak>=0.21.0",
     "bleak-retry-connector>=3.0.0"
   ],
-  "version": "0.2.1",
-  "bluetooth": [
-    {
-      "local_name": "NEEWER*"
-    },
-    {
-      "local_name": "NW-*"
-    }
-  ]
+  "version": "0.3.0-beta.1"
 }
