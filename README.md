@@ -10,6 +10,7 @@ This integration supports Neewer lights that use Bluetooth for control, includin
 
 ### Tested
 - **MS150B** - 130W Bi-Color COB Light
+- **CB60B** - 70W Bi-Color COB Light
 
 ### Should Work (Untested)
 - MS60C - 65W RGB COB Light
@@ -27,6 +28,7 @@ This integration supports Neewer lights that use Bluetooth for control, includin
 - **Brightness control** (0-100%)
 - **Color temperature control** (varies by model, typically 2700K-6500K)
 - **RGB color control** (for supported models)
+- **Built-in effects** (CB60B: lightning, paparazzi, candlelight, TV screen and eight more)
 - **Auto-discovery** via Home Assistant's Bluetooth integration
 - **Manual device entry** for devices not auto-discovered
 

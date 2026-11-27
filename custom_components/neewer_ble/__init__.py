@@ -23,6 +23,9 @@ from .const import (
     DEFAULT_COLOR_TEMP,
     CONF_DEFAULT_BRIGHTNESS,
     CONF_DEFAULT_COLOR_TEMP,
+    CONF_DISCONNECT_AFTER,
+    CONF_LOCAL_NAME,
+    DEFAULT_DISCONNECT_AFTER,
 )
 from .neewer_device import NeewerLightDevice
 
@@ -41,32 +44,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Try to get the BLE device
     ble_device = async_ble_device_from_address(hass, address.upper(), connectable=True)
 
+    # The name the light advertises tells the model. It is kept with the entry, so the
+    # model is also known when Home Assistant starts while the light has no power.
+    local_name: str | None = entry.data.get(CONF_LOCAL_NAME)
+
     if ble_device is None:
-        _LOGGER.warning(
-            "Device %s not found via HA Bluetooth, creating placeholder with name '%s'",
+        _LOGGER.info(
+            "Device %s not heard on Bluetooth yet, set up as '%s' until it is",
             address,
-            name,
+            local_name or name,
         )
         # Create a minimal BLE device object for connection attempts
         # The actual connection will happen when commands are sent
         ble_device = BLEDevice(
             address=address,
-            name=name,
+            name=local_name or name,
             details={},
             rssi=-100,
         )
     else:
         _LOGGER.info("Found BLE device: %s (%s)", ble_device.name, ble_device.address)
+        if ble_device.name and ble_device.name != local_name:
+            hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_LOCAL_NAME: ble_device.name}
+            )
 
     # Get options with defaults
     default_brightness = entry.options.get(CONF_DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS)
     default_color_temp = entry.options.get(CONF_DEFAULT_COLOR_TEMP, DEFAULT_COLOR_TEMP)
+    disconnect_after = entry.options.get(CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER)
 
     # Create the device handler
     device = NeewerLightDevice(
         ble_device,
         default_brightness=default_brightness,
         default_color_temp=default_color_temp,
+        disconnect_after=disconnect_after,
     )
     _LOGGER.info(
         "Created device handler - Model: %s, RGB: %s, Infinity: %s, Default Bri: %d, Default CT: %dK",
@@ -98,8 +111,9 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     default_brightness = entry.options.get(CONF_DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS)
     default_color_temp = entry.options.get(CONF_DEFAULT_COLOR_TEMP, DEFAULT_COLOR_TEMP)
+    disconnect_after = entry.options.get(CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER)
 
-    device.set_defaults(default_brightness, default_color_temp)
+    device.set_defaults(default_brightness, default_color_temp, disconnect_after)
     _LOGGER.info(
         "Updated defaults for %s - Brightness: %d, Color Temp: %dK",
         device.name,

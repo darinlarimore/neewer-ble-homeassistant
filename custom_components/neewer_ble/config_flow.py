@@ -25,6 +25,9 @@ from .const import (
     DEFAULT_COLOR_TEMP,
     CONF_DEFAULT_BRIGHTNESS,
     CONF_DEFAULT_COLOR_TEMP,
+    CONF_DISCONNECT_AFTER,
+    DEFAULT_DISCONNECT_AFTER,
+    MAX_DISCONNECT_AFTER,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -225,6 +228,9 @@ class NeewerBLEOptionsFlow(config_entries.OptionsFlow):
         current_color_temp = self.config_entry.options.get(
             CONF_DEFAULT_COLOR_TEMP, DEFAULT_COLOR_TEMP
         )
+        current_disconnect_after = self.config_entry.options.get(
+            CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -238,6 +244,10 @@ class NeewerBLEOptionsFlow(config_entries.OptionsFlow):
                         CONF_DEFAULT_COLOR_TEMP,
                         default=current_color_temp,
                     ): vol.All(vol.Coerce(int), vol.Range(min=2700, max=10000)),
+                    vol.Optional(
+                        CONF_DISCONNECT_AFTER,
+                        default=current_disconnect_after,
+                    ): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_DISCONNECT_AFTER)),
                 }
             ),
         )
