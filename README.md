@@ -23,6 +23,7 @@ something yourself, see [CONTRIBUTING.md](CONTRIBUTING.md).
 |---|---|---|
 | **CB60B** | 70W bi-color COB | Tested on 0.3.0 (two units), including effects |
 | **MS150B** | 130W bi-color COB | Tested up to 0.2.1; not yet re-tested on 0.3.0 |
+| **RGB1** | RGB light wand | Tested by its owner on the code in [#11](https://github.com/darinlarimore/neewer-ble-homeassistant/pull/11) (ESPHome Bluetooth proxy); not yet re-tested since that was ported |
 | CB100C | RGB COB | Reported: color resets when brightness changes ([#4](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/4)); 0.3.0 should fix it, unconfirmed |
 | RGB168 | RGB panel | Reported: inconsistent response ([#8](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/8)) |
 | PL60C, AP150C | | Reported: discovered but no control ([#9](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/9)) |
@@ -31,7 +32,7 @@ something yourself, see [CONTRIBUTING.md](CONTRIBUTING.md).
 | RGB660, RGB660 PRO, RGB480, RGB530, RGB530 PRO, RGB176, RGB960 | RGB panels | Untested |
 | RGB512, RGB800 | RGB panels | Untested |
 | SL-80, SNL-660, SNL-530, SNL-480 | Bi-color panels | Untested |
-| RGB1, TL60 RGB | Wand and tube | Untested |
+| TL60 RGB | Tube | Untested |
 
 A light that is not in the table is set up as a generic bi-color light (3200 K to 5600 K). It may
 work, partly work or not respond: [ask for it to be added](https://github.com/darinlarimore/neewer-ble-homeassistant/issues/new?template=new_model.yml).

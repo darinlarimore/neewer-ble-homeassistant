@@ -78,6 +78,9 @@ To try a change, copy `custom_components/neewer_ble/` into your Home Assistant
 - The **Validate** workflow runs the HACS and hassfest checks on every pull request. `hassfest`
   wants the keys in `manifest.json` in order: `domain`, `name`, then alphabetical.
 - Update the README's light table when a light's status changes.
+- `tests/` holds protocol tests that run without Home Assistant or a light: they check the bytes a
+  command sends. Run them with `pip install bleak bleak-retry-connector` and
+  `python -m unittest discover -s tests`. A test for the packets your light needs is very welcome.
 
 ## Layout
 

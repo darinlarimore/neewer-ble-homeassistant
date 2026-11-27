@@ -67,8 +67,13 @@ SUPPORTED_MODELS = {
     "RGB512": {"name": "RGB512", "rgb": True, "cct_range": (2500, 10000), "cct_only": False, "light_type": 2},
     "RGB800": {"name": "RGB800", "rgb": True, "cct_range": (2500, 10000), "cct_only": False, "light_type": 2},
 
+    # RGB1 light wand - advertises as "NW-20200015&..." and takes the Infinity commands; the standard
+    # ones are ignored. Brightness 0 leaves its LEDs lit, so "off" is the power command, and it stays
+    # reachable over Bluetooth in standby. Checked on one unit through an ESPHome Bluetooth proxy (#11).
+    "20200015": {"name": "RGB1", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 1,
+                 "real_power": True},
+
     # Light wands - Standard protocol
-    "RGB1": {"name": "RGB1", "rgb": True, "cct_range": (3200, 5600), "cct_only": False, "light_type": 0},
     "TL60": {"name": "TL60 RGB", "rgb": True, "cct_range": (2700, 6500), "cct_only": False, "light_type": 0},
 }
 
